@@ -1,32 +1,10 @@
 """
-Same pump assembly, but with the left/right nozzle symmetry fixed.
- 
-Previous bug: the left elbow was built via `mirror('YZ')` then rotated +90°
-about Z. The mirror flipped the elbow's handedness (a right-hand bend
-became a left-hand bend in the local frame), and the subsequent rotation
-then mapped that flipped frame to world coords in a slightly-off way.
- 
-Fix: don't mirror at all. Build the elbow once (right-hand bend, inlet
-along +Y, curves toward +X). Place the right nozzle with one rotation,
-and place the left nozzle with a DIFFERENT rotation that takes the same
-unmirrored elbow to the +X-curving-toward-+Y... wait, that's wrong too.
- 
-The clean approach: build the elbow once, place the right copy by rotating
-the local +Y axis to point along world +X. For the left copy, we want a
-mirror image — but we achieve it by mirroring AFTER placement, not before.
-So place the right elbow first, then mirror the world-frame result across
-the YZ plane to produce the left copy.
- 
-Because mirroring is the LAST operation, the final positions of the two
-nozzles are exact mirror images of each other — no compounded transform
-errors.
- 
-Implementation note: calling .mirror("YZ") on a swept OCCT solid produces
-a shape with REVERSED face orientation, which causes .union() to hang
-indefinitely. Fix: construct the left elbow by reflecting the path wire
-analytically (mirror_x=True in _elbow_path_wire) and sweeping a fresh
-solid. Result is geometrically identical to the mirrored solid but with
-correct outward normals.
+Parametric primary pump: hollow barrel cylinder with two lateral elbow
+nozzles (right and left, mirror-symmetric) and one top flange.
+
+The left elbow is built by reflecting the path wire analytically
+(mirror_x=True) rather than mirroring the swept solid, which would
+reverse OCCT face normals and cause union() to hang.
 """
  
 from __future__ import annotations

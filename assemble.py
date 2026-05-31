@@ -192,7 +192,9 @@ def assemble_objects(object_specs: List[Dict[str, Any]], export_path: str | None
     objects: Dict[str, cq.Workplane] = {}
     subnames_per_obj: Dict[str, List[str]] = {}
 
+    print(f"Building {len(object_specs)}-component assembly:")
     for spec in object_specs:
+        print(f"  {spec.get('obj_type', spec.get('operation', '?'))}  [{spec.get('obj_id', '')}]")
         spec_copy = spec.copy()
         operation = spec_copy.pop("operation")
         spec_copy.pop("insert_into",  None)
@@ -239,14 +241,21 @@ def assemble_objects(object_specs: List[Dict[str, Any]], export_path: str | None
     # ── Overlap detection ──────────────────────────────────────────────
     intentional_pairs = set()
     for spec in object_specs:
-        target = spec.get("insert_into")
-        if target is None:
+        obj_id = spec.get("obj_id")
+        if obj_id is None:
             continue
-        targets = [target] if isinstance(target, str) else target
-        for tid in targets:
-            intentional_pairs.add((spec["obj_id"], tid))
-            intentional_pairs.add((tid, spec["obj_id"]))
+        # insert_into pairs
+        for tid in ([spec["insert_into"]] if isinstance(spec.get("insert_into"), str)
+                    else spec.get("insert_into") or []):
+            intentional_pairs.add((obj_id, tid))
+            intentional_pairs.add((tid, obj_id))
+        # interfaces_with pairs — designed touching interfaces (e.g. IHX
+        # walls against top-plate hole edges, pump barrel against redan hole)
+        for tid in spec.get("interfaces_with", []):
+            intentional_pairs.add((obj_id, tid))
+            intentional_pairs.add((tid, obj_id))
 
+    overlap_shapes: list[tuple[str, cq.Workplane]] = []
     solid_list = list(objects.items())
     for i in range(len(solid_list)):
         id_i, wp_i = solid_list[i]
@@ -258,11 +267,14 @@ def assemble_objects(object_specs: List[Dict[str, Any]], export_path: str | None
                 inter = wp_i.val().intersect(wp_j.val())  # type: ignore
                 if not inter.isNull() and inter.Volume() > 1e-4:
                     warnings.warn(
-                        f"Unintentional overlap detected between '{id_i}' and '{id_j}' "
-                        f"(volume ≈ {inter.Volume():.2f} mm³). "
-                        f"Use insert_into or apply_boolean_operations to resolve.",
+                        f"Overlap detected between '{id_i}' and '{id_j}' "
+                        f"(volume ≈ {inter.Volume():.5f} mm³). ",
                         stacklevel=2,
                     )
+                    overlap_shapes.append((
+                        f"OVERLAP_{id_i}__{id_j}",
+                        cq.Workplane().newObject([inter]),
+                    ))
             except Exception:
                 pass
 
@@ -283,7 +295,7 @@ def assemble_objects(object_specs: List[Dict[str, Any]], export_path: str | None
 
     assembly._specs = object_specs  # type: ignore
 
-    # ── STEP export with obj_id + prefixed sub-component names ─────────
+    # ── STEP export (overlap shapes excluded) ──────────────────────────
     if export_path is not None:
         import os
         parent = os.path.dirname(export_path)
@@ -296,6 +308,10 @@ def assemble_objects(object_specs: List[Dict[str, Any]], export_path: str | None
             subnames_per_obj=subnames_per_obj,
         )
         print(f"Assembly exported to: {export_path}")
+
+    # ── Add overlap solids for viewer only (after STEP export) ─────────
+    for overlap_name, overlap_wp in overlap_shapes:
+        assembly.add(overlap_wp, name=overlap_name, color=cq.Color(1, 0, 0, 1))
 
     return assembly
 

@@ -14,5 +14,5 @@ def create_profile_from_straight_connections(
     if closed:
         s = s.close().assemble()
     wp = cq.Workplane(plane).placeSketch(s)
-    wp._plane_name = plane  # store it manually  # type: ignore[attr-defined]
+    wp._plane_name = plane  # type: ignore[attr-defined]
     return wp

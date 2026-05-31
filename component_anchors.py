@@ -22,7 +22,7 @@ cheap and avoids circular dependencies.
 
 For components whose anchor positions cannot be computed in closed form
 from the dict, the resolver falls back to building the component once
-and measuring (see PUMP_CENTROID_LOCAL_Z below for an example).
+and measuring its centroid directly.
 """
 
 from __future__ import annotations

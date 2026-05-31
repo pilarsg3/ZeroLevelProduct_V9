@@ -48,8 +48,8 @@ def convert_polar_to_cartesian(r: float, theta: float, z: float) -> Tuple[float,
     return (x, y, z)
 
 
-# Function used to rotate the objects ---- rotation angles are in DEG ----- X (roll), Y (pitch), Z (yaw) through center
-def rotate_rpy_about_self_global_axes(res, roll=0, pitch=0, yaw=0): 
+# angles in degrees; X=roll, Y=pitch, Z=yaw, all through the shape's own centre
+def rotate_rpy_about_self_global_axes(res, roll=0, pitch=0, yaw=0):
     c = res.val().Center()
     if roll:  res = res.rotate((c.x,c.y,c.z), (c.x+1,c.y,c.z), roll)   # global X through center
     if pitch: res = res.rotate((c.x,c.y,c.z), (c.x,c.y+1,c.z), pitch)  # global Y through center
@@ -97,11 +97,6 @@ def revolve_profile(
     }
     if axis not in _DIRS: raise ValueError("axis must be 'X', 'Y', or 'Z'")
     local_dir = cast(cq.Vector, plane.toLocalCoords(plane.origin + _DIRS[axis]) - plane.toLocalCoords(plane.origin))  # type: ignore[operator]
-    # .x and .y here are local plane axes, not global X/Y
-    # toLocalCoords handles the mapping for any plane (XY, XZ, YZ)
-    
-    # p0 = (local_point.x, local_point.y)
-    # p1 = (local_point.x + local_dir.x, local_point.y + local_dir.y)
 
     # Use whichever two local coordinates carry the axis direction
     if abs(local_dir.z) > abs(local_dir.x) and abs(local_dir.z) > abs(local_dir.y):
@@ -112,11 +107,6 @@ def revolve_profile(
         p0 = (local_point.x, local_point.y)
         p1 = (local_point.x + local_dir.x, local_point.y + local_dir.y)
 
-
-
-    print(f"DEBUG: axis={axis}")
-    print(f"  local_dir={local_dir.toTuple()}")
-    print(f"  p0={p0}, p1={p1}")
 
 
     return profile.revolve(angle, p0, p1)

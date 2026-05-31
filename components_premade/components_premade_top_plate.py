@@ -4,7 +4,7 @@ Top plate / upper head plate builder for reactor vessel models.
 Creates a flat circular plate with arbitrary hole patterns (for IHX penetrations,
 control rod drives, instrument nozzles, etc.).
 
-Positioning follows the same convention as build_solid and zz_utils:
+Positioning follows the same convention as build_solid:
   - plate is built centred at the origin
   - rotation_angles (roll, pitch, yaw) in degrees are applied first
   - center_coords (or center_coords_pol) moves the centroid to the final position

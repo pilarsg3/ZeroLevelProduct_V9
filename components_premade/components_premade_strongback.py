@@ -1,5 +1,5 @@
 """
-Parametric SFR strongback — ZLP V3.
+Parametric SFR strongback.
 
 Built by revolving a closed half-section profile 360° around the Z axis,
 then cutting the central bore and the small bolt/instrument holes.

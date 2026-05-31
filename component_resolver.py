@@ -53,6 +53,12 @@ from components_premade.components_premade_primary_pump import create_primary_pu
 def _find_all(dicts: list[dict], obj_type: str) -> list[dict]:
     return [d for d in dicts if d.get("obj_type") == obj_type]
 
+def _add_interface(comp: dict, target_id: str) -> None:
+    """Mark comp as intentionally touching target_id (suppresses overlap warning)."""
+    existing = comp.get("interfaces_with", [])
+    if target_id not in existing:
+        comp["interfaces_with"] = existing + [target_id]
+
 def _find_one(dicts: list[dict], obj_type: str) -> dict | None:
     matches = _find_all(dicts, obj_type)
     if len(matches) > 1:
@@ -213,6 +219,12 @@ def _resolve_pump_diagrid(dicts: list[dict]) -> None:
         p["rotation_angles"] = (0.0, 0.0, a - 90.0)
         p["center_coords"]   = (r * math.cos(rad), r * math.sin(rad), cc_z)
 
+    # Pump elbow mouths mate with diagrid bosses — intentional contact.
+    diagrid_id = diagrid.get("obj_id")
+    if diagrid_id is not None:
+        for p in pumps:
+            _add_interface(p, diagrid_id)
+
 
 # ════════════════════════════════════════════════════════════════════════
 #  Connection rule: ihx ↔ reactor_top_plate
@@ -265,6 +277,16 @@ def _resolve_ihx_topplate(dicts: list[dict]) -> None:
         ihx.setdefault("center_coords",   (r * math.cos(rad), r * math.sin(rad), center_z))
         ihx.setdefault("rotation_angles", (0.0, 0.0, a))
 
+    # IHX barrels and pump barrels both pass through holes in the top plate —
+    # their walls touch the hole edges by design.
+    plate_id = top_plate.get("obj_id")
+    if plate_id is not None:
+        for ihx in ihxs:
+            _add_interface(ihx, plate_id)
+        for pump in _find_all(dicts, "primary_pump"):
+            if not _is_opted_out(pump):
+                _add_interface(pump, plate_id)
+
 
 # ════════════════════════════════════════════════════════════════════════
 #  Connection rule: ihx + primary_pump → redan penetrations
@@ -283,6 +305,7 @@ def _resolve_redan_penetrations(dicts: list[dict]) -> None:
     redan = _find_one(dicts, "redan")
     if redan is None:
         return
+    redan_id = redan.get("obj_id")   # user-assigned name, may be anything
 
     penetrations: list[tuple[float, float, float]] = []
 
@@ -313,6 +336,10 @@ def _resolve_redan_penetrations(dicts: list[dict]) -> None:
             continue
 
         penetrations.append((px, py, pr))
+        # Interface marking is independent of penetration cutting — only
+        # possible when both components carry an obj_id.
+        if redan_id is not None:
+            _add_interface(comp, redan_id)
 
     if penetrations:
         redan.setdefault("penetrations", penetrations)
@@ -322,11 +349,35 @@ def _resolve_redan_penetrations(dicts: list[dict]) -> None:
 #  Public entry point
 # ════════════════════════════════════════════════════════════════════════
 
+def _resolve_stacking_interfaces(dicts: list[dict]) -> None:
+    """
+    Mark all intentional touching interfaces arising from the vertical
+    component stack and mechanical fits:
+      - strongback inside reactor vessel bottom head
+      - diagrid resting on strongback
+      - core resting on diagrid
+      - above-core structure collar fitting inside top plate central hole
+    """
+    def _link(type_a: str, type_b: str) -> None:
+        a = _find_one(dicts, type_a)
+        b = _find_one(dicts, type_b)
+        if a is None or b is None:
+            return
+        id_a, id_b = a.get("obj_id"), b.get("obj_id")
+        if id_a is not None and id_b is not None:
+            _add_interface(a, id_b)
+
+    _link("strongback",           "reactor_vessel")
+    _link("diagrid",              "strongback")
+    _link("reactor_core",         "diagrid")
+    _link("above_core_structure", "reactor_top_plate")
+
+
 _CONNECTION_RULES = [
     _resolve_pump_diagrid,
     _resolve_ihx_topplate,
-    _resolve_redan_penetrations,   # must run last — reads center_coords set above
-    # _resolve_strongback_rpv,
+    _resolve_redan_penetrations,
+    _resolve_stacking_interfaces,
 ]
 
 def resolve(user_dicts: list[dict]) -> list[dict]:

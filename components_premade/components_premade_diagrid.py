@@ -1,21 +1,9 @@
 """
-Parametric diagrid — final version.
+Parametric diagrid.
 
 Hollow short cylinder with thin walls (default 30 mm on all sides) closed
 top and bottom, with lateral bosses for pump-elbow connection. The bores
 pierce the lateral wall and open into the interior cavity.
-
-Key changes vs early versions:
-  - `wall_t` split into `wall_t_side`, `wall_t_top`, `wall_t_bottom` so the
-    plates can be thinner than the lateral wall (or vice versa) without
-    blocking the bore.
-  - Bore length is computed analytically so the LATERAL edges of the
-    bore — not just the centerline — pierce the inner wall, avoiding the
-    "vertical strip" rendering artifact.
-  - Bosses are inset into the outer wall before being extruded radially
-    outward, so the union with the curved wall is gap-free.
-  - Validation: raises a clear error if the top/bottom plate would clip
-    the bore, or if the boss vertically extends past the disc faces.
 """
 
 from __future__ import annotations

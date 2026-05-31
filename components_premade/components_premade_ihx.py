@@ -1,7 +1,5 @@
 """
-components_premade/simple_ihx.py
-─────────────────────────────────
-Parametric shell-and-tube IHX builder for ZeroLevelProduct V7.
+Parametric shell-and-tube IHX builder.
 
 Geometry (bottom → top, z increasing upward)
 ─────────────────────────────────────────────
@@ -45,7 +43,7 @@ import cadquery as cq
 
 def create_ihx(spec: Dict[str, Any]) -> cq.Workplane:
     """
-    Build a simple shell-and-tube IHX. All lengths in mm.
+    Build a simple shell-and-tube IHX. All lengths in the model's length unit (metres in the example assemblies).
 
     spec keys
     ─────────

@@ -8,9 +8,6 @@ The vessel shell always runs from z=0 to z=straight_h, so the top face is
 exactly at z=straight_h — no bounding box lookup needed. The top plate
 centroid is placed at z=straight_h + plate_thickness/2.
 
-Returns (vessel, top_plate) as a tuple. top_plate is None if
-top_plate_thickness is not provided.
-
 Example
 -------
 >>> vessel, top_plate = create_reactor_vessel(
@@ -287,35 +284,11 @@ def create_reactor_vessel(
     elif top_head_type not in (None, "flat"):
         inner = inner.union(_build_top_head(inner_d, top_head_type, top_head_params, straight_h))
 
-    # The following cut produced different objects, leading to problems in downstream operations when exporting to DAGMC
-    # vessel = outer.cut(inner).clean()
-
-    # After the boolean operations (union + cut), CadQuery/OCCT does not always
-    # produce a single topological solid. Instead, it can leave the result as a
-    # "compound" — multiple sub-shapes (e.g. cylinder + hemisphere) that are
-    # visually merged but internally still separate entities.
-    #
-    # This causes problems downstream when cad_to_dagmc processes the STEP file:
-    # it counts each sub-shape as a separate volume, so what looks like 1 component
-    # becomes 2 volumes, causing a material tag mismatch.
-    #
-    # The fix below forces OCCT to perform a true topological fusion (Fuse),
-    # which merges all sub-shapes into a single connected solid with no internal
-    # boundaries. This ensures the STEP export contains exactly 1 volume per component.
-
-    # The following doesn't work because The result is a Compound, not a Solid, so .Fuse() isn't available. 
-    # Use CadQuery's own fusion instead. Replace the fix in reactor_vessel.py with hte other code below:
-
-    # vessel = outer.cut(inner).clean()
-    # vessel = cq.Workplane().add(
-    # cq.Shape.cast(vessel.val().wrapped.Fuse(vessel.val().wrapped)) #type: ignore
-    # )
-
-
     vessel = outer.cut(inner).clean()
 
-    # Force true topological fusion into a single solid.
-    # .combine() merges all sub-shapes in the compound into one connected solid.
+    # OCCT can leave the result as a compound of sub-shapes. Force a true
+    # topological fusion so the STEP export contains exactly one solid per
+    # component (required for DAGMC neutronics workflows).
     solids = vessel.solids().vals()
     fused = solids[0]
     for s in solids[1:]:

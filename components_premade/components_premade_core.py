@@ -1,15 +1,15 @@
 """
-Parametric SFR reactor core � ZLP V3.
+Parametric SFR reactor core.
 
 Single public function:
-    create_reactor_core()  � solid cylinder or regular n-sided prism
+    create_reactor_core()  — solid cylinder or regular n-sided prism
 
 The cross-section is controlled by:
     radius      circumscribed radius (vertex-to-centre), same convention as
                 cq.Sketch().regularPolygon()
-    n_sides     number of polygon sides; None or 0 ? circular cylinder
+    n_sides     number of polygon sides; None or 0 → circular cylinder
 
-Returns a single cq.Workplane solid (same pattern as create_reactor_vessel).
+Returns a single cq.Workplane solid.
 """
 
 from __future__ import annotations

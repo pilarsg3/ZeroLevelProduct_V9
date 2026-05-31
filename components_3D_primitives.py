@@ -199,31 +199,24 @@ def _build_wedge(obj: Dict[str, Any], index: int) -> cq.Workplane:
     xmin, xmax = obj["xmin"], obj["xmax"]
     zmin, zmax = obj["zmin"], obj["zmax"]
     
-    # Validate positive dimensions
     if dx <= 0: raise ValueError(f"Wedge dx must be > 0 at index {index} (obj_id: {obj_id})")
     if dy <= 0: raise ValueError(f"Wedge dy must be > 0 at index {index} (obj_id: {obj_id})")
     if dz <= 0: raise ValueError(f"Wedge dz must be > 0 at index {index} (obj_id: {obj_id})")
-    # Validate x range
-    if xmin >= xmax:   raise ValueError(
+    if xmin >= xmax:
+        raise ValueError(
             f"Wedge requires xmin < xmax at index {index} (obj_id: {obj_id})."
             f"Got xmin={xmin}, xmax={xmax}"
         )
-    
-    # Validate z range
     if zmin >= zmax:
         raise ValueError(
             f"Wedge requires zmin < zmax at index {index} (obj_id: {obj_id})."
             f"Got zmin={zmin}, zmax={zmax}"
         )
-    
-    # Validate x bounds
     if not (0 <= xmin <= dx and 0 <= xmax <= dx):
         raise ValueError(
             f"Wedge x-parameters must be in [0, dx] at index {index} (obj_id: {obj_id})."
             f"Got dx={dx}, xmin={xmin}, xmax={xmax}"
         )
-    
-    # Validate z bounds
     if not (0 <= zmin <= dz and 0 <= zmax <= dz):
         raise ValueError(
             f"Wedge z-parameters must be in [0, dz] at index {index} (obj_id: {obj_id})."
@@ -232,38 +225,6 @@ def _build_wedge(obj: Dict[str, Any], index: int) -> cq.Workplane:
     
     return cq.Workplane("XY").wedge(dx, dy, dz, xmin, zmin, xmax, zmax)
 
-
-# def _build_cylinder_closed_bottom(obj: Dict[str, Any], index: int) -> cq.Workplane:
-#     """Build a hollow cylinder with closed bottom."""
-#     obj_id = obj.get("obj_id", f"obj_{index}")
-#     h = obj["height"]
-#     ro = obj["outer_radius"]
-#     t = obj["wall_thickness"]
-#     tb = obj["bottom_thickness"]
-    
-#     if h <= 0: raise ValueError(f"Cylinder_closed_bottom height must be > 0 at index {index} (obj_id: {obj_id})")
-#     if ro <= 0: raise ValueError(f"Cylinder_closed_bottom outer_radius must be > 0 at index {index} (obj_id: {obj_id})")
-#     if t <= 0 or t >= ro:
-#         raise ValueError(
-#             f"Cylinder_closed_bottom wall_thickness must be in (0, outer_radius) "
-#             f"at index {index} (obj_id: {obj_id}). Got wall_thickness={t}, outer_radius={ro}"
-#         )
-#     if tb < 0 or tb >= h:
-#         raise ValueError(
-#             f"Cylinder_closed_bottom bottom_thickness must be in [0, height) "
-#             f"at index {index} (obj_id: {obj_id}). Got bottom_thickness={tb}, height={h}"
-#         )
-    
-#     ri = ro - t  # inner radius
-#     outer = cq.Workplane("XY").cylinder(h, ro)
-    
-#     # Create inner cutout: starts above bottom to leave bottom cap
-#     # Outer cylinder spans z in [-h/2, +h/2]. Inner cut starts at z = (-h/2 + tb)
-#     inner_h = (h - tb) + EPSILON
-#     inner_center_z = (tb + EPSILON) / 2.0
-#     inner = cq.Workplane("XY").cylinder(inner_h, ri).translate((0, 0, inner_center_z))
-    
-#     return outer.cut(inner)
 
 def _build_cylinder_closed_bottom(obj: Dict[str, Any], index: int) -> cq.Workplane:
     """
@@ -348,19 +309,6 @@ def _build_cylinder_closed_bottom(obj: Dict[str, Any], index: int) -> cq.Workpla
         inner = inner_cyl.union(inner_head)
 
     return outer.cut(inner).clean()
-
-
-# def _build_pipe(obj: Dict[str, Any], index: int) -> cq.Workplane:
-#     """Build a hollow cylinder (pipe), open both ends."""
-#     obj_id = obj.get("obj_id", f"obj_{index}")
-#     h, ro, ri = obj["height"], obj["outer_radius"], obj["inner_radius"]
-
-#     if h <= 0: raise ValueError(f"Pipe height must be > 0 at index {index} (obj_id: {obj_id})")
-#     if ro <= 0: raise ValueError(f"Pipe outer_radius must be > 0 at index {index} (obj_id: {obj_id})")
-#     if ri <= 0 or ri >= ro: raise ValueError(f"Pipe inner_radius must be in (0, outer_radius) at index {index} (obj_id: {obj_id})")
-
-#     return cq.Workplane("XY").cylinder(h, ro).cut(cq.Workplane("XY").cylinder(h, ri))
-
 
 
 def _build_pipe(obj: Dict[str, Any], index: int) -> cq.Workplane:
@@ -471,21 +419,6 @@ def _compute_intersections(
 
 
 
-# def build_3D_primitive(obj: Dict[str, Any]) -> cq.Workplane:
-#     """Build a single 3D primitive from a config dict, applying position and rotation."""
-#     shape = _validate_shape_type(obj, 0)
-#     _validate_required_params(obj, shape, 0)
-#     workplane = _build_shape(obj, shape, 0)
-#     pos = _extract_position(obj, 0)
-#     roll, pitch, yaw = _get_rotation_angles(obj)
-#     workplane = rotate_rpy_about_self_global_axes(workplane, int(roll), int(pitch), int(yaw))
-#     if pos is not None:
-#         workplane = move_center_to(workplane, pos)
-#     return workplane
-
-
-
-
 def build_3D_primitive(obj: Dict[str, Any]) -> cq.Workplane:
     """Build a single 3D primitive from a config dict. No positioning applied."""
     shape = _validate_shape_type(obj, 0)
@@ -506,56 +439,12 @@ def build_3D_primitive(obj: Dict[str, Any]) -> cq.Workplane:
 
 def set_components(primitives_list: List[Dict[str, Any]]) -> cq.Assembly:  # type: ignore
     """
-    Build and assemble 3D primitive components with visualization.
-    
-    Constructs 3D shapes from configuration dictionaries, applies positional and
-    rotational transformations, and creates an assembly showing original shapes
-    and their intersection regions.
-    
-    Parameters
-    -----------
-    primitives_list : List[Dict[str, Any]]
-        List of shape configuration dictionaries. Each dict must contain:
-        - obj_id (str): Unique identifier for the object
-        - obj_type (str): Shape type (see ShapeType enum)
-        - Shape-specific parameters (see REQUIRED_PARAMS)
-        - Optional: center_coords (x, y, z) or center_coords_pol (r, theta, z in radians)
-        - Optional: rotation_angles (roll, pitch, yaw in degrees)
-    
-    Returns
-    -------
-    cq.Assembly
-        Assembly containing original shapes and intersection regions (in red)
-    
-    Raises
-    ------
-    KeyError
-        If required parameters are missing
-    ValueError
-        If parameters are invalid or out of range
-    RuntimeError
-        If an unhandled shape type is encountered
-    
-    Examples
-    --------
-    >>> box = {
-    ...     "obj_id": "box1",
-    ...     "obj_type": "box",
-    ...     "length": 10,
-    ...     "width": 20,
-    ...     "height": 5,
-    ...     "center_coords": (0, 0, 5)
-    ... }
-    >>> cylinder = {
-    ...     "obj_id": "cyl1",
-    ...     "obj_type": "cylinder",
-    ...     "height": 15,
-    ...     "radius": 3,
-    ...     "center_coords_pol": (5, 0, 0)  # r=5, theta=0, z=0
-    ... }
-    >>> assembly = set_components([box, cylinder])
+    Build and display a cq.Assembly from a list of primitive shape dicts.
+
+    Each dict must have obj_id, obj_type, shape-specific params, and
+    optionally center_coords / center_coords_pol and rotation_angles.
+    Intersection regions between shapes are added in red.
     """
-    print(f"DEBUG: Processing {len(primitives_list)} shapes")
     all_components: List[Tuple[cq.Workplane, str]] = []
     
     for index, obj in enumerate(primitives_list):
