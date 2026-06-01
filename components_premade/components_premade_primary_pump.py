@@ -31,7 +31,7 @@ def _elbow_path_wire(
                    L_inlet + R_bend * math.sin(arc_rad),
                    0.0)
     tan_end     = (sx * math.sin(arc_rad), math.cos(arc_rad), 0.0)
- 
+
     leg_total = L_leg + overshoot
     P_end     = (P_arc_end[0] + leg_total * tan_end[0],
                  P_arc_end[1] + leg_total * tan_end[1],

@@ -84,7 +84,7 @@ def diagrid_outer_radius(diagrid: dict[str, Any]) -> float:
 
 def diagrid_z_range(diagrid: dict[str, Any]) -> tuple[float, float]:
     z_bottom = diagrid.get("z_bottom", 0.0)
-    return z_bottom, z_bottom + diagrid["thickness"]
+    return z_bottom, z_bottom + diagrid["height"]
 
 
 # ════════════════════════════════════════════════════════════════════════

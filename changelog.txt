@@ -1,0 +1,33 @@
+======================================================================
+TIMESTAMP : 2026-06-01 17:08:11
+COMMIT    : 28ff673
+AUTHOR    : pilarsg3
+MESSAGE   : Codebase cleanup, redan penetrations, overlap detection improvements
+STATS     :  14 files changed, 109 insertions(+), 525 deletions(-)
+FILES CHANGED:
+  - assemble.py
+  - component_anchors.py
+  - component_resolver.py
+  - components_3D_primitives.py
+  - components_premade/__init__.py
+  - components_premade/components_premade_core.py
+  - components_premade/components_premade_diagrid.py
+  - components_premade/components_premade_ihx.py
+  - components_premade/components_premade_primary_pump.py
+  - components_premade/components_premade_reactor_vessel.py
+  - components_premade/components_premade_strongback.py
+  - components_premade/components_premade_top_plate.py
+  - profile_from_straight_connections.py
+  - utils.py
+
+======================================================================
+TIMESTAMP : 2026-06-01 17:46:39
+COMMIT    : b532e71
+AUTHOR    : pilarsg3
+MESSAGE   : Checked diagrid, core, rv, top_plate
+STATS     :  3 files changed, 529 insertions(+), 1 deletion(-)
+FILES CHANGED:
+  - examples_reactor/esfr_smr_full_reactor_revised.py
+  - examples_reactor/esfr_smr_full_reactor_with_redan_example1.py
+  - examples_reactor/example2.py
+

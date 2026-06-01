@@ -187,12 +187,17 @@ def _resolve_pump_diagrid(dicts: list[dict]) -> None:
         boss_angles.append(a - phi_deg)
         boss_angles.append(a + phi_deg)
 
+    # nozzle_r_bore and nozzle_r_boss are derived from pump geometry:
+    #   bore = pump nozzle outer radius (snug fit at the diagrid wall face)
+    #   boss = bore + boss_wall_t
+    boss_wall_t = diagrid.get("boss_wall_t", 0.071)
+
     # Fill in the diagrid dict (never overwrite user-set values).
     diagrid.setdefault("nozzle_z_abs",           nozzle_z_world)
     diagrid.setdefault("nozzle_boss_angles_deg", boss_angles)
     diagrid.setdefault("nozzle_boss_height",     boss_protrusion)
     diagrid.setdefault("nozzle_r_bore",          ref["nozzle_r_pipe"])
-    diagrid.setdefault("nozzle_r_boss",          ref["nozzle_r_pipe"] + 0.071)
+    diagrid.setdefault("nozzle_r_boss",          ref["nozzle_r_pipe"] + boss_wall_t)
 
     # Place each pump (skip those the user already placed).
     #

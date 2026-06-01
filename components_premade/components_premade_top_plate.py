@@ -18,7 +18,7 @@ Example
 -------
 >>> plate = create_top_plate(
 ...     plate_outer_d   = 92.0,
-...     plate_thickness = 3.0,
+...     plate_t = 3.0,
 ...     center_coords   = (0, 0, 91.5),   # centroid at z = straight_h + thickness/2
 ...     hole_groups=[
 ...         dict(hole_diameter=10.0, layout="explicit_positions", positions=[(0.0, 0.0)]),
@@ -87,29 +87,21 @@ def _hole_centers(group: dict[str, Any]) -> list[tuple[float, float]]:
         )
 
 
-def _make_cutter(hole_d: float, plate_thickness: float, x: float, y: float) -> cq.Workplane:
+def _make_cutter(hole_d: float, plate_t: float, x: float, y: float) -> cq.Workplane:
     """
     Return a solid cylinder centred at (x, y, 0) — through the full plate
     thickness which is centred at z=0.  Used as a Boolean cutter.
     """
     EPS = 1e-3
-    cut_h = plate_thickness + 2.0 * EPS
-    # # ---- Removing the following because it creates a circular import with build_solid()
-    # cutter, _ = build_solid(
-    #     "primitive",
-    #     {"obj_type": "cylinder", "height": cut_h, "radius": hole_d / 2.0},
-    #     center_coords=(x, y, 0.0),
-    # )
-    # return cutter
+    cut_h = plate_t + 2.0 * EPS
     return cq.Workplane("XY").cylinder(cut_h, hole_d / 2.0).translate((x, y, 0.0))
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
+
+
 
 def create_top_plate(
     plate_outer_d: float,
-    plate_thickness: float,
+    plate_t: float,
     hole_groups: list[dict[str, Any]] | None = None,
     *,
     center_coords:     Tuple[float, float, float] | None = None,
@@ -126,25 +118,25 @@ def create_top_plate(
     ----------
     plate_outer_d : float
         Outer diameter of the plate.
-    plate_thickness : float
+    plate_t : float
         Thickness (height) of the plate.
     hole_groups : list[dict], optional
         Each element describes one group of identically-sized holes.  Keys:
 
-          hole_diameter  (float) – diameter of every hole in this group
-          layout         (str)   – 'symmetric' | 'custom_angles' | 'explicit_positions'
+          hole_diameter  (float) - diameter of every hole in this group
+          layout         (str)   - 'symmetric' | 'custom_angles' | 'explicit_positions'
 
           For 'symmetric':
-            count            (int)   – number of holes
-            placement_radius (float) – radial distance from plate centre
-            start_angle_deg  (float) – first hole angle in degrees (default 0)
+            count            (int)   - number of holes
+            placement_radius (float) - radial distance from plate centre
+            start_angle_deg  (float) - first hole angle in degrees (default 0)
 
           For 'custom_angles':
-            angles_deg       (list[float]) – explicit angles in degrees
+            angles_deg       (list[float]) - explicit angles in degrees
             placement_radius (float)
 
           For 'explicit_positions':
-            positions (list[tuple[float, float]]) – XY offsets from plate centre
+            positions (list[tuple[float, float]]) - XY offsets from plate centre
 
     center_coords : tuple[float, float, float], optional
         (x, y, z) of the plate centroid after rotation.
@@ -160,22 +152,13 @@ def create_top_plate(
     """
     if plate_outer_d <= 0:
         raise ValueError("plate_outer_d must be > 0")
-    if plate_thickness <= 0:
-        raise ValueError("plate_thickness must be > 0")
+    if plate_t <= 0:
+        raise ValueError("plate_t must be > 0")
 
     # ------------------------------------------------------------------ #
     # 1.  Build base plate centred at origin                              #
     # ------------------------------------------------------------------ #
-    # # ---- Removing the following because it creates a circular import with build_solid()
-    # plate_solid, _ = build_solid(
-    #     "primitive",
-    #     {
-    #         "obj_type": "cylinder",
-    #         "height":   plate_thickness,
-    #         "radius":   plate_outer_d / 2.0,
-    #     },
-    # )
-    plate_solid = cq.Workplane("XY").cylinder(plate_thickness, plate_outer_d / 2.0)
+    plate_solid = cq.Workplane("XY").cylinder(plate_t, plate_outer_d / 2.0)
 
     # ------------------------------------------------------------------ #
     # 2.  Cut hole groups                                                  #
@@ -195,7 +178,7 @@ def create_top_plate(
                     stacklevel=2,
                 )
             plate_solid = plate_solid.cut(
-                _make_cutter(hole_d, plate_thickness, hx, hy)
+                _make_cutter(hole_d, plate_t, hx, hy)
             )
 
     # ------------------------------------------------------------------ #
@@ -227,7 +210,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------
     plate_A = create_top_plate(
         plate_outer_d   = 92.0,
-        plate_thickness = 3.0,
+        plate_t = 3.0,
         center_coords   = (0.0, 0.0, 91.5),
         hole_groups=[
             dict(hole_diameter=10.0, layout="explicit_positions", positions=[(0.0, 0.0)]),
@@ -242,7 +225,7 @@ if __name__ == "__main__":
     # ------------------------------------------------------------------
     plate_B = create_top_plate(
         plate_outer_d   = 92.0,
-        plate_thickness = 2.0,
+        plate_t = 2.0,
         center_coords   = (0.0, 0.0, 0.0),
         rotation_angles = (0.0, 15.0, 0.0),
         hole_groups=[

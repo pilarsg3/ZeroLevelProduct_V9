@@ -13,6 +13,7 @@ import hashlib
 import warnings
 
 from utils import insert_into
+from component_resolver import resolve
 
 
 def _color_from_id(obj_id: str) -> cq.Color:
@@ -167,6 +168,10 @@ def assemble_objects(object_specs: List[Dict[str, Any]], export_path: str | None
     """
     Build a list of objects and assemble them.
 
+    Accepts raw component dicts — the resolver and operation defaults are
+    applied automatically, so callers only need to define geometry dicts,
+    pass them here, and call show() on the result.
+
     Runs geometry validation automatically before building the assembly
     (via validate_solids). Any issues found are printed as warnings —
     they never block the export.
@@ -180,6 +185,10 @@ def assemble_objects(object_specs: List[Dict[str, Any]], export_path: str | None
     "ihx_3_tube_bundle", etc.
     """
     from build_3D_solid import build_solid
+
+    for d in object_specs:
+        d.setdefault("operation", "primitive")
+    object_specs = resolve(object_specs)
 
     issues = validate_solids(object_specs)
     for issue in issues:
@@ -196,7 +205,7 @@ def assemble_objects(object_specs: List[Dict[str, Any]], export_path: str | None
     for spec in object_specs:
         print(f"  {spec.get('obj_type', spec.get('operation', '?'))}  [{spec.get('obj_id', '')}]")
         spec_copy = spec.copy()
-        operation = spec_copy.pop("operation")
+        operation = spec_copy.pop("operation", "primitive")
         spec_copy.pop("insert_into",  None)
         spec_copy.pop("material",     None)
         spec_copy.pop("material_tag", None)

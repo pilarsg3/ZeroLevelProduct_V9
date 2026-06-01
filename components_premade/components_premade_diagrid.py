@@ -1,9 +1,12 @@
 """
 Parametric diagrid.
 
-Hollow short cylinder with thin walls (default 30 mm on all sides) closed
-top and bottom, with lateral bosses for pump-elbow connection. The bores
-pierce the lateral wall and open into the interior cavity.
+Hollow short cylinder with thin walls closed top and bottom.
+
+create_diagrid   — pure hollow cylinder, no pump knowledge.
+add_nozzle_bosses — adds lateral bosses and bores for pump connections.
+                    Called by the assembly builder when the resolver has
+                    injected pump-interface parameters into the diagrid dict.
 """
 
 from __future__ import annotations
@@ -12,28 +15,21 @@ import cadquery as cq
 
 
 def create_diagrid(
-    diameter:               float,
-    thickness:              float,
-    z_bottom:               float = 0.0,
-    wall_t:                 float | None = None,   # legacy alias for all three
-    wall_t_side:            float = 0.030,
-    wall_t_top:             float = 0.030,
-    wall_t_bottom:          float = 0.030,
-    open_top:               bool  = False,
-    open_bottom:            bool  = False,
-    nozzle_boss_angles_deg: list[float] | None = None,
-    nozzle_z_abs:           float | None = None,
-    nozzle_r_bore:          float = 0.230,
-    nozzle_r_boss:          float = 0.301,
-    nozzle_boss_height:     float = 0.0775,
+    diameter:      float,
+    height:        float,
+    z_bottom:      float,
+    wall_t_side:   float,
+    wall_t_top:    float,
+    wall_t_bottom: float,
+    wall_t:        float | None = None,   # shortcut — sets all three wall thicknesses at once
 ) -> cq.Workplane:
+    """Hollow short cylinder, always closed on top and bottom."""
 
-    # Legacy support
     if wall_t is not None:
         wall_t_side = wall_t_top = wall_t_bottom = wall_t
 
-    if diameter <= 0 or thickness <= 0:
-        raise ValueError("diameter and thickness must be > 0")
+    if diameter <= 0 or height <= 0:
+        raise ValueError("diameter and height must be > 0")
     if wall_t_side <= 0:
         raise ValueError("wall_t_side must be > 0")
     if wall_t_top < 0 or wall_t_bottom < 0:
@@ -46,118 +42,148 @@ def create_diagrid(
             f"wall_t_side ({wall_t_side}) is too large for diameter ({diameter})."
         )
 
-    z_top = z_bottom + thickness
+    z_top = z_bottom + height
 
-    cavity_z_bottom = z_bottom if open_bottom else z_bottom + wall_t_bottom
-    cavity_z_top    = z_top    if open_top    else z_top    - wall_t_top
+    cavity_z_bottom = z_bottom + wall_t_bottom
+    cavity_z_top    = z_top    - wall_t_top
     cavity_height   = cavity_z_top - cavity_z_bottom
     if cavity_height <= 0:
         raise ValueError(
             f"wall_t_top + wall_t_bottom ({wall_t_top + wall_t_bottom}) "
-            f"is too large for thickness ({thickness})."
+            f"is too large for height ({height})."
         )
 
-    # Bore obstruction check
-    if nozzle_z_abs is not None and nozzle_boss_angles_deg:
-        bore_z_low  = nozzle_z_abs - nozzle_r_bore
-        bore_z_high = nozzle_z_abs + nozzle_r_bore
-        if (not open_top) and bore_z_high > cavity_z_top:
-            raise ValueError(
-                f"Top plate (Z = [{cavity_z_top:.4f}, {z_top:.4f}]) "
-                f"overlaps the bore (Z = [{bore_z_low:.4f}, "
-                f"{bore_z_high:.4f}]). Reduce wall_t_top to ≤ "
-                f"{(z_top - bore_z_high):.4f} m or move the bore down."
-            )
-        if (not open_bottom) and bore_z_low < cavity_z_bottom:
-            raise ValueError(
-                f"Bottom plate (Z = [{z_bottom:.4f}, {cavity_z_bottom:.4f}]) "
-                f"overlaps the bore (Z = [{bore_z_low:.4f}, "
-                f"{bore_z_high:.4f}]). Reduce wall_t_bottom to ≤ "
-                f"{(bore_z_low - z_bottom):.4f} m or move the bore up."
-            )
-
-    # ── Shell: hollow body ────────────────────────────────────────────────
     shell = (cq.Workplane("XY")
              .workplane(offset=z_bottom)
              .circle(radius_outer)
-             .extrude(thickness))
+             .extrude(height))
 
     cavity = (cq.Workplane("XY")
               .workplane(offset=cavity_z_bottom)
               .circle(radius_inner)
               .extrude(cavity_height))
 
-    shell = shell.cut(cavity)
+    return shell.cut(cavity).clean()
 
-    # ── Bosses + bores ────────────────────────────────────────────────────
+
+def add_nozzle_bosses(
+    diagrid_solid:          cq.Workplane,
+    *,
+    radius_outer:           float,
+    radius_inner:           float,
+    z_bottom:               float,
+    z_top:                  float,
+    cavity_z_bottom:        float,
+    cavity_z_top:           float,
+    nozzle_boss_angles_deg: list[float],
+    nozzle_z_abs:           float,
+    nozzle_r_bore:          float,
+    nozzle_r_boss:          float,
+    nozzle_boss_height:     float,
+) -> cq.Workplane:
+    """
+    Add lateral nozzle bosses and bores to an existing diagrid solid.
+
+    Each boss is a short cylinder protruding from the outer wall; each bore
+    is cut through the boss and the diagrid wall into the interior cavity,
+    forming the pump-to-diagrid fluid connection.
+
+    All parameters here are derived by the resolver from pump geometry and
+    diagrid dimensions — they are never set by the user directly.
+
+    Parameters
+    ----------
+    diagrid_solid : cq.Workplane
+        Shell returned by create_diagrid.
+    radius_outer, radius_inner : float
+        Outer and inner radii of the diagrid shell.
+    z_bottom, z_top : float
+        Absolute z bounds of the diagrid shell.
+    cavity_z_bottom, cavity_z_top : float
+        Absolute z bounds of the hollow interior cavity.
+    nozzle_boss_angles_deg : list[float]
+        Azimuthal angles (degrees) at which bosses are placed.
+    nozzle_z_abs : float
+        Absolute z of the boss / bore centre-line.
+    nozzle_r_bore : float
+        Radius of the bore (= pump nozzle outer radius).
+    nozzle_r_boss : float
+        Outer radius of the boss cylinder (= nozzle_r_bore + diagrid boss_wall_t).
+    nozzle_boss_height : float
+        Protrusion height of the boss beyond the diagrid outer wall.
+    """
+    if nozzle_r_boss >= radius_outer:
+        raise ValueError(
+            f"nozzle_r_boss ({nozzle_r_boss}) must be smaller than "
+            f"diagrid outer radius ({radius_outer})."
+        )
+    if nozzle_r_bore >= radius_inner:
+        raise ValueError(
+            f"nozzle_r_bore ({nozzle_r_bore}) must be smaller than "
+            f"diagrid inner radius ({radius_inner})."
+        )
+
+    bore_z_low  = nozzle_z_abs - nozzle_r_bore
+    bore_z_high = nozzle_z_abs + nozzle_r_bore
+    if bore_z_high > cavity_z_top:
+        raise ValueError(
+            f"Top plate (Z = [{cavity_z_top:.4f}, {z_top:.4f}]) "
+            f"overlaps the bore (Z = [{bore_z_low:.4f}, {bore_z_high:.4f}]). "
+            f"Reduce wall_t_top or move the bore down."
+        )
+    if bore_z_low < cavity_z_bottom:
+        raise ValueError(
+            f"Bottom plate (Z = [{z_bottom:.4f}, {cavity_z_bottom:.4f}]) "
+            f"overlaps the bore (Z = [{bore_z_low:.4f}, {bore_z_high:.4f}]). "
+            f"Reduce wall_t_bottom or move the bore up."
+        )
+
+    margin = nozzle_r_boss
+    if not (z_bottom + margin < nozzle_z_abs < z_top - margin):
+        raise ValueError(
+            f"nozzle_z_abs={nozzle_z_abs:.4f} m clips the diagrid face. "
+            f"Must be in ({z_bottom + margin:.4f}, {z_top - margin:.4f})."
+        )
+
+    inset_min         = radius_outer - math.sqrt(radius_outer**2 - nozzle_r_boss**2)
+    inset_safe        = inset_min + 0.005
+    boss_total_height = inset_safe + nozzle_boss_height
+
+    L_min       = (radius_outer + nozzle_boss_height) - math.sqrt(radius_inner**2 - nozzle_r_bore**2)
+    bore_length = L_min + 0.010
+
+    shell: cq.Workplane        = diagrid_solid
     boss_solids: list[cq.Workplane] = []
 
-    if nozzle_boss_angles_deg and nozzle_z_abs is not None:
+    for theta in nozzle_boss_angles_deg:
+        rad = math.radians(theta)
 
-        if nozzle_r_boss >= radius_outer:
-            raise ValueError(
-                f"nozzle_r_boss ({nozzle_r_boss}) must be smaller than "
-                f"diagrid outer radius ({radius_outer})."
-            )
-        if nozzle_r_bore >= radius_inner:
-            raise ValueError(
-                f"nozzle_r_bore ({nozzle_r_bore}) must be smaller than "
-                f"diagrid inner radius ({radius_inner})."
-            )
+        outward = cq.Vector( math.cos(rad),  math.sin(rad), 0.0)
+        inward  = cq.Vector(-math.cos(rad), -math.sin(rad), 0.0)
+        tangent = cq.Vector(-math.sin(rad),  math.cos(rad), 0.0)
 
-        inset_min  = radius_outer - math.sqrt(radius_outer**2 - nozzle_r_boss**2)
-        inset_safe = inset_min + 0.005
-        boss_total_height = inset_safe + nozzle_boss_height
-
-        margin = nozzle_r_boss
-        if not (z_bottom + margin < nozzle_z_abs < z_top - margin):
-            raise ValueError(
-                f"nozzle_z_abs={nozzle_z_abs:.4f} m clips the diagrid face. "
-                f"Must be in ({z_bottom + margin:.4f}, {z_top - margin:.4f})."
-            )
-
-        L_min = (
-            (radius_outer + nozzle_boss_height)
-            - math.sqrt(radius_inner**2 - nozzle_r_bore**2)
+        base_origin = cq.Vector(
+            (radius_outer - inset_safe) * math.cos(rad),
+            (radius_outer - inset_safe) * math.sin(rad),
+            nozzle_z_abs,
         )
-        bore_length = L_min + 0.010
+        boss = (cq.Workplane(cq.Plane(origin=base_origin, xDir=tangent, normal=outward))
+                .circle(nozzle_r_boss)
+                .extrude(boss_total_height))
 
-        for theta in nozzle_boss_angles_deg:
-            rad = math.radians(theta)
+        outer_face_origin = cq.Vector(
+            (radius_outer + nozzle_boss_height) * math.cos(rad),
+            (radius_outer + nozzle_boss_height) * math.sin(rad),
+            nozzle_z_abs,
+        )
+        bore = (cq.Workplane(cq.Plane(origin=outer_face_origin, xDir=tangent, normal=inward))
+                .circle(nozzle_r_bore)
+                .extrude(bore_length))
 
-            outward = cq.Vector( math.cos(rad),  math.sin(rad), 0.0)
-            inward  = cq.Vector(-math.cos(rad), -math.sin(rad), 0.0)
-            tangent = cq.Vector(-math.sin(rad),  math.cos(rad), 0.0)
+        boss  = boss.cut(bore)
+        shell = shell.cut(bore)
+        boss_solids.append(boss.clean())
 
-            base_x = (radius_outer - inset_safe) * math.cos(rad)
-            base_y = (radius_outer - inset_safe) * math.sin(rad)
-            base_origin = cq.Vector(base_x, base_y, nozzle_z_abs)
-
-            boss_plane = cq.Plane(
-                origin=base_origin, xDir=tangent, normal=outward
-            )
-            boss = (cq.Workplane(boss_plane)
-                    .circle(nozzle_r_boss)
-                    .extrude(boss_total_height))
-
-            outer_face_origin = cq.Vector(
-                (radius_outer + nozzle_boss_height) * math.cos(rad),
-                (radius_outer + nozzle_boss_height) * math.sin(rad),
-                nozzle_z_abs,
-            )
-            bore_plane = cq.Plane(
-                origin=outer_face_origin, xDir=tangent, normal=inward
-            )
-            bore = (cq.Workplane(bore_plane)
-                    .circle(nozzle_r_bore)
-                    .extrude(bore_length))
-
-            # Cut bore through both boss and shell
-            boss  = boss.cut(bore)
-            shell = shell.cut(bore)
-            boss_solids.append(boss.clean())
-
-    # ── Assemble ──────────────────────────────────────────────────────────
     result = shell.clean()
     for b in boss_solids:
         result = result.union(b)
@@ -167,9 +193,12 @@ def create_diagrid(
 if __name__ == "__main__":
     from ocp_vscode import show
 
-    assy = create_diagrid(
-        diameter   = 4.660,
-        thickness  = 1.050,
-        z_bottom   = -0.460,
+    diagrid = create_diagrid(
+        diameter      = 4.660,
+        height        = 1.050,
+        z_bottom      = -0.460,
+        wall_t_side   = 0.030,
+        wall_t_top    = 0.030,
+        wall_t_bottom = 0.030,
     )
-    show(assy)
+    show(diagrid)

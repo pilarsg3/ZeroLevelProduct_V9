@@ -21,27 +21,30 @@ from .components_premade_ihx                  import create_ihx
 from .components_premade_core                 import create_reactor_core
 from .components_premade_strongback           import create_strongback
 from .components_premade_primary_pump         import create_primary_pump
-from .components_premade_diagrid              import create_diagrid
+from .components_premade_diagrid              import create_diagrid, add_nozzle_bosses
 from .components_premade_above_core_structure import create_above_core_structure
 from .components_premade_redan                import create_redan
 
 
 def _build_reactor_vessel(obj: dict[str, Any]) -> cq.Workplane:
     return create_reactor_vessel(
-        inner_d            = obj["inner_d"],
-        wall_t             = obj["wall_t"],
-        straight_h         = cast(float, obj.get("straight_h") or obj.get("height")),
-        bottom_head_type   = obj.get("bottom_head_type"),
-        bottom_head_params = obj.get("bottom_head_params"),
-        top_head_type      = obj.get("top_head_type"),
-        top_head_params    = obj.get("top_head_params"),
+        inner_d               = obj.get("inner_d"),
+        wall_t                = obj.get("wall_t"),
+        outer_d               = obj.get("outer_d"),
+        straight_h            = cast(float, obj.get("straight_h") or obj.get("height")),
+        bottom_head_type      = obj.get("bottom_head_type"),
+        bottom_head_params    = obj.get("bottom_head_params"),
+        top_head_type         = obj.get("top_head_type"),
+        top_head_params       = obj.get("top_head_params"),
+        top_plate_thickness   = obj.get("top_plate_thickness"),
+        top_plate_hole_groups = obj.get("top_plate_hole_groups"),
     )
 
 
 def _build_reactor_top_plate(obj: dict[str, Any]) -> cq.Workplane:
     return create_top_plate(
         plate_outer_d   = obj["outer_d"],
-        plate_thickness = obj["thickness"],
+        plate_t         = obj["thickness"],
         center_coords   = (0.0, 0.0, obj["z_bottom"] + obj["thickness"] / 2.0),
         hole_groups     = obj.get("hole_groups"),
     )
@@ -98,22 +101,46 @@ def _build_primary_pump(obj: dict[str, Any]) -> cq.Workplane:
 
 
 def _build_diagrid(obj: dict[str, Any]) -> cq.Workplane:
-    return create_diagrid(
-        diameter                = obj["diameter"],
-        thickness               = obj["thickness"],
-        z_bottom                = obj.get("z_bottom", 0.0),
-        wall_t                  = obj.get("wall_t"),
-        wall_t_side             = obj.get("wall_t_side",   0.030),
-        wall_t_top              = obj.get("wall_t_top",    0.030),
-        wall_t_bottom           = obj.get("wall_t_bottom", 0.030),
-        open_top                = obj.get("open_top",    False),
-        open_bottom             = obj.get("open_bottom", False),
-        nozzle_boss_angles_deg  = obj.get("nozzle_boss_angles_deg"),
-        nozzle_z_abs            = obj.get("nozzle_z_abs"),
-        nozzle_r_bore           = obj.get("nozzle_r_bore",      0.230),
-        nozzle_r_boss           = obj.get("nozzle_r_boss",      0.301),
-        nozzle_boss_height      = obj.get("nozzle_boss_height", 0.0775),
+    wall_t        = obj.get("wall_t")
+    wall_t_side   = wall_t if wall_t is not None else obj.get("wall_t_side",   0.030)
+    wall_t_top    = wall_t if wall_t is not None else obj.get("wall_t_top",    0.030)
+    wall_t_bottom = wall_t if wall_t is not None else obj.get("wall_t_bottom", 0.030)
+    z_bottom      = obj.get("z_bottom", 0.0)
+    height        = obj["height"]
+    diameter      = obj["diameter"]
+
+    solid = create_diagrid(
+        diameter      = diameter,
+        height        = height,
+        z_bottom      = z_bottom,
+        wall_t_side   = obj.get("wall_t_side",   0.030),
+        wall_t_top    = obj.get("wall_t_top",    0.030),
+        wall_t_bottom = obj.get("wall_t_bottom", 0.030),
+        wall_t        = wall_t,
     )
+
+    if obj.get("nozzle_boss_angles_deg"):
+        radius_outer    = diameter / 2.0
+        radius_inner    = radius_outer - wall_t_side
+        z_top           = z_bottom + height
+        cavity_z_bottom = z_bottom + wall_t_bottom
+        cavity_z_top    = z_top    - wall_t_top
+        solid = add_nozzle_bosses(
+            solid,
+            radius_outer           = radius_outer,
+            radius_inner           = radius_inner,
+            z_bottom               = z_bottom,
+            z_top                  = z_top,
+            cavity_z_bottom        = cavity_z_bottom,
+            cavity_z_top           = cavity_z_top,
+            nozzle_boss_angles_deg = obj["nozzle_boss_angles_deg"],
+            nozzle_z_abs           = obj["nozzle_z_abs"],
+            nozzle_r_bore          = obj["nozzle_r_bore"],
+            nozzle_r_boss          = obj["nozzle_r_boss"],
+            nozzle_boss_height     = obj["nozzle_boss_height"],
+        )
+
+    return solid
 
 
 def _build_above_core_structure(obj: dict[str, Any]) -> cq.Workplane:
@@ -178,8 +205,9 @@ def build_premade_component(obj: dict[str, Any]) -> cq.Workplane:
 
 def _assy_reactor_vessel(obj: dict[str, Any]) -> cq.Workplane:
     return create_reactor_vessel(
-        inner_d               = obj["inner_d"],
-        wall_t                = obj["wall_t"],
+        inner_d               = obj.get("inner_d"),
+        wall_t                = obj.get("wall_t"),
+        outer_d               = obj.get("outer_d"),
         straight_h            = cast(float, obj.get("straight_h") or obj.get("height")),
         bottom_head_type      = obj.get("bottom_head_type"),
         bottom_head_params    = obj.get("bottom_head_params"),
@@ -193,7 +221,7 @@ def _assy_reactor_vessel(obj: dict[str, Any]) -> cq.Workplane:
 def _assy_reactor_top_plate(obj: dict[str, Any]) -> cq.Workplane:
     return create_top_plate(
         plate_outer_d   = obj["outer_d"],
-        plate_thickness = obj["thickness"],
+        plate_t         = obj["thickness"],
         center_coords   = (0.0, 0.0, obj["z_bottom"] + obj["thickness"] / 2.0),
         hole_groups     = obj.get("hole_groups"),
     )
@@ -246,22 +274,7 @@ def _assy_primary_pump(obj: dict[str, Any]) -> cq.Workplane:
 
 
 def _assy_diagrid(obj: dict[str, Any]) -> cq.Workplane:
-    return create_diagrid(
-        diameter               = obj["diameter"],
-        thickness              = obj["thickness"],
-        z_bottom               = obj.get("z_bottom", 0.0),
-        wall_t                 = obj.get("wall_t"),
-        wall_t_side            = obj.get("wall_t_side",   0.030),
-        wall_t_top             = obj.get("wall_t_top",    0.030),
-        wall_t_bottom          = obj.get("wall_t_bottom", 0.030),
-        open_top               = obj.get("open_top",    False),
-        open_bottom            = obj.get("open_bottom", False),
-        nozzle_boss_angles_deg = obj.get("nozzle_boss_angles_deg"),
-        nozzle_z_abs           = obj.get("nozzle_z_abs"),
-        nozzle_r_bore          = obj.get("nozzle_r_bore",      0.230),
-        nozzle_r_boss          = obj.get("nozzle_r_boss",      0.301),
-        nozzle_boss_height     = obj.get("nozzle_boss_height", 0.0775),
-    )
+    return _build_diagrid(obj)
 
 
 def _assy_above_core_structure(obj: dict[str, Any]) -> cq.Workplane:

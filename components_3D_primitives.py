@@ -276,14 +276,14 @@ def _build_cylinder_closed_bottom(obj: Dict[str, Any], index: int) -> cq.Workpla
         )
 
     ri  = ro - t
-    od  = 2 * ro
-    id_ = 2 * ri
+    outer_d = 2 * ro
+    id_     = 2 * ri
 
     # ------------------------------------------------------------------
     # Outer solid: centered cylinder [-h/2, +h/2] + head below z = -h/2
     # ------------------------------------------------------------------
     outer_cyl  = cq.Workplane("XY").circle(ro).extrude(h).translate((0, 0, -h / 2))
-    outer_head = _build_outer_head(od, head_type, head_params).translate((0, 0, -h / 2))
+    outer_head = _build_outer_head(outer_d, head_type, head_params).translate((0, 0, -h / 2))
     outer      = outer_cyl.union(outer_head)
 
     # ------------------------------------------------------------------
