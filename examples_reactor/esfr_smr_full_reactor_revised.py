@@ -145,7 +145,7 @@ DIAGRID = {
     "obj_type":      "diagrid",
     "obj_id":        "diagrid",
     "diameter":      4.660,
-    "height":        1.050,
+    "thickness":     1.050,
     "z_bottom":      _DIAGRID_Z_BOTTOM,
     "wall_t_side":   0.030,
     "wall_t_top":    0.030,
