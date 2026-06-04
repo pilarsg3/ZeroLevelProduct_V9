@@ -164,20 +164,43 @@ def _build_above_core_structure(obj: dict[str, Any]) -> cq.Workplane:
     )
 
 
+def _apply_redan_penetrations(
+    solid: cq.Workplane, obj: dict[str, Any]
+) -> cq.Workplane:
+    penetrations = obj.get("penetrations")
+    if not penetrations:
+        return solid
+    profile_pts = obj.get("profile_pts")
+    z_vals = [z for _, z in profile_pts] if profile_pts else [
+        obj["z_top"], obj["z_bottom"]
+    ]
+    z_cut_bot = min(z_vals) - 1.0
+    z_cut_top = max(z_vals) + 1.0
+    for px, py, pr in penetrations:
+        cutter = (
+            cq.Workplane("XY")
+            .workplane(offset=z_cut_bot)
+            .center(px, py)
+            .circle(pr)
+            .extrude(z_cut_top - z_cut_bot)
+        )
+        solid = solid.cut(cutter)
+    return solid
+
+
 def _build_redan(obj: dict[str, Any]) -> cq.Workplane:
-    return create_redan(
+    solid = create_redan(
         r_top          = obj["r_top"],
         z_top          = obj["z_top"],
         r_lower        = obj["r_lower"],
         z_knee         = obj["z_knee"],
         z_bottom       = obj["z_bottom"],
-        thickness      = obj.get("thickness", 0.025),
-        z_shoulder     = obj.get("z_shoulder"),
-        thickness_side = obj.get("thickness_side", "in"),
-        profile_pts    = obj.get("profile_pts"),
-        z_offset       = obj.get("z_offset", 0.0),
-        penetrations   = obj.get("penetrations"),
+        thickness   = obj.get("thickness", 0.025),
+        z_shoulder  = obj.get("z_shoulder"),
+        profile_pts = obj.get("profile_pts"),
+        z_offset    = obj.get("z_offset", 0.0),
     )
+    return _apply_redan_penetrations(solid, obj)
 
 
 PREMADE_BUILDERS: dict[str, Any] = {
@@ -299,19 +322,18 @@ def _assy_above_core_structure(obj: dict[str, Any]) -> cq.Workplane:
 
 
 def _assy_redan(obj: dict[str, Any]) -> cq.Workplane:
-    return create_redan(
+    solid = create_redan(
         r_top          = obj["r_top"],
         z_top          = obj["z_top"],
         r_lower        = obj["r_lower"],
         z_knee         = obj["z_knee"],
         z_bottom       = obj["z_bottom"],
-        thickness      = obj.get("thickness", 0.025),
-        z_shoulder     = obj.get("z_shoulder"),
-        thickness_side = obj.get("thickness_side", "in"),
-        profile_pts    = obj.get("profile_pts"),
-        z_offset       = obj.get("z_offset", 0.0),
-        penetrations   = obj.get("penetrations"),
+        thickness   = obj.get("thickness", 0.025),
+        z_shoulder  = obj.get("z_shoulder"),
+        profile_pts = obj.get("profile_pts"),
+        z_offset    = obj.get("z_offset", 0.0),
     )
+    return _apply_redan_penetrations(solid, obj)
 
 
 # ── Tier-3 entry point ────────────────────────────────────────────────────────

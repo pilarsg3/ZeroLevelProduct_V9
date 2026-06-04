@@ -4,24 +4,6 @@ Parametric SFR strongback.
 Built by revolving a closed half-section profile 360° around the Z axis,
 then cutting the central bore and the small bolt/instrument holes.
 
-All geometry dimensions are required — no defaults. This follows the same
-convention as create_reactor_vessel, keeping reactor-specific values in
-the assembly file rather than the component builder.
-
-Profile is computed from six intuitive dimensions:
-
-                        ← flange_radius →
-    ┌─────────────────────────────┐     ─┐
-    │         top flange          │      │ total_height
-    │                             |-|    │
-    │                               |-|  │  ← tapered edge
-    │                           ──────┘  │  (flange_radius → skirt_outer_radius)
-    │                          │    ─┐   │  ← taper_bottom_z
-    │                          │     │   │
-    └──────────────────────────┘     │   ┘
-       ← skirt_inner_radius          │   skirt_height
-       ←── skirt_outer_radius ───────┘
-
 profile_pts can be supplied as an advanced override for non-standard shapes.
 
 Single public function:
@@ -81,27 +63,8 @@ def create_strongback(
     Build the strongback by revolving a half-section profile 360° around Z,
     then cutting the central bore and the small bolt/instrument holes.
 
-    By default the profile is computed from the six geometry dimensions.
-    Supply profile_pts directly only if you need a non-standard cross-section
-    (all dimension parameters are then ignored).
-
-    Heights (profile_z_top, small_hole_z_bottom) are always derived from
-    whichever profile is used, so no extra height parameters are needed.
-
-    Args:
-        total_height:           overall axial height [m]
-        flange_radius:          outer radius of flat top flange [m]
-        skirt_outer_radius:     outer radius of lower skirt [m]
-        skirt_inner_radius:     inner radius of lower skirt [m]
-        skirt_height:           axial height of lower skirt section [m]
-        taper_bottom_z:         z where tapered edge meets skirt outer surface [m]
-        bore_radius:            radius of central bore [m]
-        small_hole_radius:      radius of small bolt/instrument holes [m]
-        small_hole_count:       number of small holes
-        small_hole_placement_r: radial distance of small hole centres from axis [m]
-        z_bottom:               translate whole solid so base sits at this z [m]
-        profile_pts:            advanced override — (r, z) half-section points.
-                                If provided, all dimension parameters are ignored.
+    Supply profile_pts to override the computed cross-section; all dimension
+    parameters are then ignored. Heights are derived from whichever profile is used.
 
     Returns:
         cq.Workplane — single solid with holes cut

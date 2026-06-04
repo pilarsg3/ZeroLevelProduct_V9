@@ -1,10 +1,6 @@
 """
 Parametric primary pump: hollow barrel cylinder with two lateral elbow
 nozzles (right and left, mirror-symmetric) and one top flange.
-
-The left elbow is built by reflecting the path wire analytically
-(mirror_x=True) rather than mirroring the swept solid, which would
-reverse OCCT face normals and cause union() to hang.
 """
  
 from __future__ import annotations
@@ -88,9 +84,7 @@ def _place_right_nozzle(elbow: cq.Workplane,
 def _place_left_nozzle(elbow: cq.Workplane,
                        barrel_radius: float, overshoot: float,
                        nozzle_z: float) -> cq.Workplane:
-    """Rotate so local +Y → world -X, translate to left side of barrel.
-    Pair with a mirror_x=True elbow to get true mirror geometry without
-    calling .mirror() on a solid (which inverts OCCT face normals)."""
+    """Rotate so local +Y → world -X, translate to left side of barrel."""
     return (elbow
             .rotate((0, 0, 0), (0, 0, 1), 90)
             .translate((-(barrel_radius - overshoot), 0, nozzle_z)))
@@ -132,7 +126,7 @@ def create_primary_pump(
         L_inlet=nozzle_L_inlet, L_leg=nozzle_L_leg,
         inner_overshoot=inner_overshoot, mirror_x=False,
     )
-    # Left elbow: arc curves toward -X (analytically mirrored path, fresh sweep)
+    # Left elbow: arc curves toward -X (mirrored path)
     elbow_out_L, elbow_in_L = _build_elbow_outer_inner(
         r_pipe=nozzle_r_pipe, wall_t=nozzle_wall_t,
         R_bend=nozzle_R_bend, arc_deg=nozzle_arc_deg,
@@ -156,11 +150,7 @@ def create_primary_pump(
                    .circle(barrel_radius - barrel_wall_t)
                    .extrude(barrel_height - 2 * barrel_wall_t))
  
-    # Radial bore punches: j_right_in / j_left_in start exactly at the barrel
-    # inner cylindrical surface (x = barrel_inner_radius), making only tangent
-    # (zero-area) contact there. These straight punches start from the barrel
-    # axis (x = 0) and penetrate through the inner surface, creating a proper
-    # 2D curved opening that connects the barrel interior to each nozzle bore.
+    # Straight radial punches open the barrel wall into each nozzle bore.
     nozzle_r_bore    = nozzle_r_pipe - nozzle_wall_t
     bore_punch_right = (
         cq.Workplane("YZ")
@@ -171,21 +161,7 @@ def create_primary_pump(
     )
     bore_punch_left = bore_punch_right.mirror("YZ")
  
-    # Flange bore: same tangent-contact issue as the nozzles — the flange inner
-    # face starts at y = barrel_inner_radius, making zero-area contact with the
-    # barrel's inner cylindrical surface. This box cutter starts from the barrel
-    # axis (y = 0) and extends in +Y through the barrel wall and INTO the flange,
-    # but STOPS short of the flange's outer face by barrel_wall_t. This opens the
-    # flange cavity toward the barrel interior only, while leaving a closed outer
-    # wall (a blind pocket) — i.e. walls of barrel_wall_t on all four lateral
-    # sides AND on the outer end. The inner end stays open to the barrel.
-    # Built as an explicit box (not a workplane extrude) to avoid sign ambiguity
-    # in the XZ workplane normal direction.
-    #
-    # Flange outer face is at y = barrel_radius + flange_width - overshoot
-    # (overshoot = barrel_wall_t). To leave a barrel_wall_t-thick cap there, the
-    # cutter must reach only to (outer_face - barrel_wall_t) =
-    # barrel_radius + flange_width - 2 * barrel_wall_t, starting from y = 0.
+    # Box cutter hollows the flange, leaving barrel_wall_t on all sides and open toward the barrel interior.
     _fb_w   = flange_depth  - 2 * barrel_wall_t
     _fb_len = barrel_radius + flange_width - 2 * barrel_wall_t
     _fb_h   = flange_height - 2 * barrel_wall_t
@@ -196,10 +172,6 @@ def create_primary_pump(
     )
  
     barrel       = barrel_outer.cut(barrel_bore).cut(j_right_in).cut(j_left_in).cut(bore_punch_right).cut(bore_punch_left).cut(flange_bore_cutter).clean()
-    # Do NOT cut barrel_outer from nozzles. The inlet section starts at
-    # barrel_radius - overshoot (inside the barrel wall), giving volumetric
-    # overlap needed for reliable OCCT fusion. Cutting barrel_outer would
-    # reduce the contact to a coincident face only → invalid/red solid.
     nozzle_right = j_right_out.cut(j_right_in).clean()
     nozzle_left  = j_left_out.cut(j_left_in).clean()
     flange       = flange.cut(flange_bore_cutter).clean()

@@ -1,33 +1,16 @@
 """
 Parametric shell-and-tube IHX builder.
 
-Geometry (bottom → top, z increasing upward)
-─────────────────────────────────────────────
-
-                          outlet_riser ──► lateral_pipe
-                               │
-    ╔══════════════════════════╧═╗   ← top dome (outlet_riser exits here)
-    ║   upper plenum             ║
-    ║                        ═══╬═══► central_pipe horizontal exit
-    ║   (central_pipe on axis)   ║     (bends inside upper plenum, exits +X wall)
-    ╚═══════════════════════╤════╝   ← bottom plate (n tube holes + central pipe axial bore)
-          │  │  │   tube_bundle
-    ╔═════╧══════════════════════╗   ← top plate (n tube holes + central pipe axial bore)
-    ║   lower plenum             ║
-    ║                            ║
-    ╚══════════╤═════════════════╝   ← bottom dome (central pipe axial bore)
-               │
-          central_pipe  (continues external below dome)
-
-Seven independent components
-─────────────────────────────
+Six main components (seven if bundle_shell is enabled)
+──────────────────────────────────────────────────────
   lower_plenum_shell   bowl dome + cylindrical shell + top plate
   tube_bundle          n hollow vertical tubes
   upper_plenum_shell   bottom plate + cylindrical shell + top dome
   central_pipe         L-shaped: vert on axis (through both plenums) → arc → horiz exit
-                       (pipe_436 pattern; bends inside upper plenum, exits +X wall)
+                       (bends inside upper plenum, exits +X wall)
   outlet_riser         straight vertical pipe above upper dome — independent of central_pipe
   lateral_pipe         horizontal pipe connected to outlet_riser +X wall
+  bundle_shell         (optional) windowed wrapper cylinder around the tube bundle
 
 Coordinate convention
 ─────────────────────
@@ -119,7 +102,6 @@ def create_ihx(spec: Dict[str, Any]) -> cq.Workplane:
         Fully fused IHX geometry (all components unioned).
     """
 
-    # ── Unpack ───────────────────────────────────────────────────────────────
     lp_ir, lp_wall = spec["lower_plenum_inner_radius"], spec["lower_plenum_wall"]
     lp_h,  lp_dr   = spec["lower_plenum_height"],       spec["lower_plenum_dome_radius"]
 
@@ -167,7 +149,6 @@ def create_ihx(spec: Dict[str, Any]) -> cq.Workplane:
     lat_len  = spec["lateral_pipe_length"]
     lat_z    = spec["lateral_pipe_z_offset"]
 
-    # ── Validation ────────────────────────────────────────────────────────────
     assert cp_z + cp_bend < up_h, (
         f"Central pipe bend exits the upper plenum top. "
         f"Need central_pipe_z_offset + central_pipe_bend_radius < upper_plenum_height "
@@ -231,13 +212,6 @@ def create_ihx(spec: Dict[str, Any]) -> cq.Workplane:
                  r * math.sin(math.radians(a0_deg + 360.0 * i / n)))
                 for i in range(n)]
 
-    # Flat list of (x, y, outer_radius) for all tubes — used for plate perforations
-    all_tubes: List[Tuple[float, float, float]] = [
-        (tx, ty, float(ring["inner_radius"]) + float(ring["wall"]))
-        for ring in tube_rings
-        for tx, ty in _ring_xy(ring)
-    ]
-
     # ─────────────────────────────────────────────────────────────────────────
     # 1. LOWER PLENUM SHELL
     # ─────────────────────────────────────────────────────────────────────────
@@ -299,7 +273,6 @@ def create_ihx(spec: Dict[str, Any]) -> cq.Workplane:
         # Shell extends by _overshoot into both plates for fusion connectivity
         bs_sh = _annular_cyl(bs_ir, bs_wall, bh + 2 * _overshoot, z_bot=z_lp_top - _overshoot)
 
-        # Shared cutter dimensions (same for both window rows)
         cutter_h = bs_win_h * 1.05
         chord    = 2.0 * (bs_or + bs_wall * 0.2) * math.sin(win_half_angle)
         depth    = bs_wall * 3.0
@@ -342,14 +315,9 @@ def create_ihx(spec: Dict[str, Any]) -> cq.Workplane:
         components["bundle_shell"] = bs_sh
 
     # ─────────────────────────────────────────────────────────────────────────
-    # 3. CENTRAL PIPE  (pipe_436 pattern: vert on axis → arc inside UP → horiz)
+    # 4. CENTRAL PIPE  (vert on axis → 90° arc inside upper plenum → horiz exit)
     # ─────────────────────────────────────────────────────────────────────────
-    # Built BEFORE the upper plenum so we can use the pipe's outer envelope
-    # as the cutter for the plenum's two penetrations (bottom plate + +X wall).
-    # This guarantees the holes in the plenum exactly match the pipe shape,
-    # no matter the orientation of the pipe at the penetration point.
-    #
-    # Path in XZ plane (same direction as pipe_436: +Z at start → +X at end):
+    # Path in XZ plane (+Z at start → +X at end):
     #
     #   (0, z_cp_bot)   starts at top of lower plenum
     #        │  straight up through bundle region, upper plenum
@@ -358,10 +326,6 @@ def create_ihx(spec: Dict[str, Any]) -> cq.Workplane:
     #   (cp_bend, z_cp_horiz)
     #        ─────────────────────────────────────────────►  horizontal exit
     #   (cp_bend + up_or + cp_horiz, z_cp_horiz)
-    #
-    # Profile: XY at z = z_cp_bot, centred on axis (0, 0). Ring cross-section
-    # for the final pipe; solid cross-section for the cutter (so the cut
-    # punches through the wall instead of just carving a ring-shaped slot).
 
     x_cp_far = cp_bend + up_or + cp_horiz   # far end of horizontal exit
 
@@ -374,27 +338,15 @@ def create_ihx(spec: Dict[str, Any]) -> cq.Workplane:
         .wire().val()
     )
 
-    # Solid (filled disc) sweep — used as the cutter for plenum penetrations.
-    # Stored on the workplane via _outer attribute so `insert_into(plenum,
-    # central_pipe)` would also pick it up automatically if used that way.
-    cp_outer_solid = (
-        cq.Workplane("XY").workplane(offset=z_cp_bot)
-        .circle(cp_or)                                # solid disc, no inner bore
-        .sweep(cq.Workplane("XY").newObject([cp_path]), isFrenet=True)
-    )
-
-    # Hollow pipe (ring sweep) — the actual component
     cp_pipe = (
         cq.Workplane("XY").workplane(offset=z_cp_bot)
-        .circle(cp_or).circle(cp_ir)                  # ring profile
+        .circle(cp_or).circle(cp_ir)
         .sweep(cq.Workplane("XY").newObject([cp_path]), isFrenet=True)
     )
-    # Attach the outer solid for downstream insert_into compatibility
-    cp_pipe._outer = cp_outer_solid  # type: ignore[attr-defined]
     components["central_pipe"] = cp_pipe.val()
 
     # ─────────────────────────────────────────────────────────────────────────
-    # 4. UPPER PLENUM SHELL
+    # 5. UPPER PLENUM SHELL
     # ─────────────────────────────────────────────────────────────────────────
     up_sh = _fuse(
         _solid_disc(up_ir, up_wall, z_bot=z_up_bot),
@@ -412,11 +364,10 @@ def create_ihx(spec: Dict[str, Any]) -> cq.Workplane:
     components["upper_plenum_shell"] = up_sh
 
     # ─────────────────────────────────────────────────────────────────────────
-    # 5. OUTLET RISER  (closed-top vertical pipe sitting flush on the dome)
+    # 6. OUTLET RISER  (closed-top vertical pipe sitting flush on the dome)
     # ─────────────────────────────────────────────────────────────────────────
     #
-    # Geometry (matches the user's outline sketch — flush rim, no internal
-    # cylinder hanging inside the dome):
+    # Geometry (flush rim, no internal cylinder hanging inside the dome):
     #
     #                  ┌──┐  ← closed top cap (full disc, thickness rs_wall)
     #                  │██│
@@ -443,36 +394,28 @@ def create_ihx(spec: Dict[str, Any]) -> cq.Workplane:
     # exactly the size of the riser bore + wall. Fluid in the dome rises
     # through this hole straight into the riser bore.
     #
-    # Construction order:
-    #   (a) compute z_clip and build a hollow riser tube sitting flush on it,
-    #   (b) cap the top with a solid disc (thickness rs_wall),
-    #   (c) cut a circular hole through ONLY the +X wall for the lateral.
-    # (The dome's matching circular passage is already cut in section 3.)
-    import math as _math
     if up_dr <= rs_or:
         raise ValueError(
             f"Upper plenum dome radius ({up_dr}) must be > riser outer radius "
             f"({rs_or}); otherwise the dome cannot fully contain the riser passage."
         )
-    z_clip   = z_up_top + _math.sqrt(up_dr * up_dr - rs_or * rs_or)
+    z_clip   = z_up_top + math.sqrt(up_dr * up_dr - rs_or * rs_or)
     z_rs_low = z_clip - _overshoot          # extend into dome bore for fusion
     rs_h_tot = rs_h + (z_rs_bot - z_rs_low)
     cz_rs    = z_rs_low + rs_h_tot / 2
 
-    # (a) Hollow riser tube (open at top and bottom for now)
     rs_wp = (
         cq.Workplane("XY").workplane(offset=cz_rs).cylinder(rs_h_tot, rs_or)
         .cut(cq.Workplane("XY").workplane(offset=cz_rs).cylinder(rs_h_tot, rs_ir))
     )
 
-    # (b) Cap the top with a solid disc of thickness rs_wall.
     z_cap_top = z_rs_low + rs_h_tot
     cap_cz    = z_cap_top - rs_wall / 2.0
     rs_wp = rs_wp.union(
         cq.Workplane("XY").workplane(offset=cap_cz).cylinder(rs_wall, rs_or)
     )
 
-    # (c) Lateral bore — punches the +X wall AND the curved inner wall.
+    # Lateral bore — punches the +X wall AND the curved inner wall.
     # The cutter starts at x=0 (inside the riser bore, where there is no material)
     # so it penetrates the curved inner wall (r=rs_ir) and creates a proper 2D
     # curved opening between the riser bore and the lateral pipe bore.
@@ -486,11 +429,8 @@ def create_ihx(spec: Dict[str, Any]) -> cq.Workplane:
     )
     components["outlet_riser"] = rs_wp.val()
 
-    # Note: the dome's circular passage for the riser is already cut in
-    # section 3 (upper plenum shell construction), so nothing else needed here.
-
     # ─────────────────────────────────────────────────────────────────────────
-    # 6. LATERAL PIPE
+    # 7. LATERAL PIPE
     # ─────────────────────────────────────────────────────────────────────────
     #
     # The lateral pipe wall starts at the riser's INNER radius (offset=rs_ir),

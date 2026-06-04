@@ -1,4 +1,17 @@
 ======================================================================
+TIMESTAMP : 2026-06-02
+AUTHOR    : pilarsg3
+MESSAGE   : Redan docstring update + annotated parameter diagram
+CHANGES   :
+  - components_premade/components_premade_redan.py
+      • Removed ASCII art; added compact A–B–C sketch referencing external diagram
+      • Dropped default values from create_redan() signature (all params now explicit)
+  - draw_redan_params.py  (new)
+      • Generates redan_params.png: annotated half cross-section with radius
+        arrows at each anchor (A, shoulder, B, C) and height ticks on z-axis
+  - redan_params.png  (new)
+
+======================================================================
 TIMESTAMP : 2026-06-01 17:08:11
 COMMIT    : 28ff673
 AUTHOR    : pilarsg3
@@ -30,4 +43,22 @@ FILES CHANGED:
   - examples_reactor/esfr_smr_full_reactor_revised.py
   - examples_reactor/esfr_smr_full_reactor_with_redan_example1.py
   - examples_reactor/example2.py
+
+======================================================================
+TIMESTAMP : 2026-06-01 17:49:04
+COMMIT    : a4254a5
+AUTHOR    : pilarsg3
+MESSAGE   : Simplify user API: resolve + defaults moved into assemble_objects
+STATS     :  10 files changed, 374 insertions(+), 249 deletions(-)
+FILES CHANGED:
+  - assemble.py
+  - changelog.txt
+  - component_anchors.py
+  - component_resolver.py
+  - components_3D_primitives.py
+  - components_premade/__init__.py
+  - components_premade/components_premade_diagrid.py
+  - components_premade/components_premade_primary_pump.py
+  - components_premade/components_premade_reactor_vessel.py
+  - components_premade/components_premade_top_plate.py
 
