@@ -7,7 +7,7 @@ Three bodies unioned:
                              revolved around the LOCAL ORIGIN (cone axis).
                              SOLID — no inner bore.
 
-  Closing plate [z4-cp_h → z4]
+  Closing plate [z4 - closing_plate_height → z4]
                              solid disk (outer r = top_cyl_outer_r),
                              translated by (top_cyl_offset_x, top_cyl_offset_y).
 
@@ -54,8 +54,8 @@ def _revolve_closed(pts: list[tuple[float, float]]) -> cq.Workplane:
 
 def create_above_core_structure(
     # ── Top cylinder — upper axis (0, 0) ─────────────────────────────────
-    top_cyl_outer_r: float,  # outer radius of the top cylinder [m]
-    top_cyl_height:  float,  # axial height of the top cylinder [m]
+    top_cyl_outer_r: float,
+    top_cyl_height:  float,
 
     # ── Neck — lower / cone axis ──────────────────────────────────────────
     neck_outer_r: float,
@@ -74,7 +74,7 @@ def create_above_core_structure(
     bottom_ring_height:  float,
 
     # ── Closing plate ─────────────────────────────────────────────────────
-    closing_plate_height: float,   # thickness of the plate at z4 [m]
+    closing_plate_height: float,
 
     # ── Top cylinder offset relative to the lower-shell (cone) axis ──────
     # The lower shell (cone + collar + neck) sits on the local origin. The
@@ -106,8 +106,8 @@ def create_above_core_structure(
       2. ``closing_plate`` [z4 - closing_plate_height → z4]
       3. ``upper_cyl``     [z4 → z5]
 
-    Boolean ops (flow holes, bottom holes) happen INSIDE each part before
-    being added to the Assembly.
+    Boolean ops (flow holes, bottom holes) are applied to each part before
+    the final union.
     """
     # ── Validate ─────────────────────────────────────────────────────────
     checks = [
@@ -156,7 +156,6 @@ def create_above_core_structure(
         (0,                   0),
     ]
     lower_solid = _revolve_closed(lower_pts)
-    # (no translation — lower shell stays on the origin)
 
     # ── 2. Closing plate ──────────────────────────────────────────────────
     # Full disk; translated to the top-cylinder offset.
@@ -186,8 +185,8 @@ def create_above_core_structure(
             z_c     = float(group["z_center"])
             n       = int(group["n_holes"])
             start_a = float(group.get("start_angle_deg", 0.0))
-            if z_c < 0 or z_c > z5:
-                raise ValueError(f"z_center={z_c} outside [0, {z5:.4f}]")
+            if z_c < 0 or z_c > z4:
+                raise ValueError(f"z_center={z_c} outside [0, {z4:.4f}] (lower shell range)")
             if z_c <= z1:
                 r_mid = cone_bottom_outer_r - wall_t / 2.0
             elif z_c <= z2:
@@ -218,8 +217,8 @@ def create_above_core_structure(
 
         if counter_d <= through_d:
             raise ValueError("counter_d must be greater than through_d")
-        if counter_depth <= 0 or counter_depth >= z5:
-            raise ValueError(f"counter_depth out of range: {counter_depth}")
+        if counter_depth <= 0 or counter_depth > closing_plate_height:
+            raise ValueError(f"counter_depth ({counter_depth}) must be in (0, closing_plate_height={closing_plate_height}]")
 
         through_r = through_d / 2.0
         counter_r = counter_d / 2.0
