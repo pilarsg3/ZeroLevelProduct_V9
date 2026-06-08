@@ -211,27 +211,28 @@ REDAN = {
 }
 
 # ── Above-core structure ─────────────────────────────────────────────────
-# The component's lower shell (bottom ring + cone + collar + neck) sits on
-# the component's local origin, and the top cylinder is displaced sideways
-# by top_cyl_offset_x. This way the cone — and the hex through-hole pattern
+# The component's lower shell (bottom ring + cone + neck) sits on the
+# component's local origin, and the top cylinder is displaced sideways by
+# top_cyl_offset_x. This way the cone — and the hex through-hole pattern
 # beneath it — can be aligned with the reactor core via the assembly's
 # center_coords (which the assembler defaults to (0, 0, …)), while the top
 # cylinder is offset so it doesn't clash with the pumps / IHX nozzles.
 #
-# The component is positioned vertically so that its collar (the wider
-# band between cone and neck) lands flush inside the top plate's central
-# opening:
-#   collar_height                       = top_plate_thickness
-#   z2 (collar bottom, local) + z_bottom = top_plate bottom (world)
+# Positioned vertically so the lower part of the neck registers into the top
+# plate's central opening:
+#   z2 (cone top = neck bottom, local) + z_bottom = top_plate bottom (world)
 _ACS_TOP_CYL_HEIGHT      = 1.008
-_ACS_NECK_HEIGHT         = 0.569
 _ACS_CONE_HEIGHT         = 2.429
 _ACS_BOTTOM_RING_HEIGHT  = 0.498
-_ACS_COLLAR_HEIGHT       = 0.092 #0.500   # = top plate thickness (lock fit)
+# Single straight neck above the cone (no collar). This folds the former
+# collar band (0.092) into the neck (0.569) so the geometry is unchanged.
+_ACS_NECK_IN_PLATE_H     = 0.092   # lower neck length registering in the plate
+_ACS_NECK_FREE_H         = 0.569   # neck length above the plate
+_ACS_NECK_HEIGHT         = _ACS_NECK_IN_PLATE_H + _ACS_NECK_FREE_H   # 0.661
 
-# Local z2 = collar bottom in ACS-local coordinates
+# Local z2 = cone top (= neck bottom) in ACS-local coordinates
 _ACS_Z2_LOCAL = _ACS_BOTTOM_RING_HEIGHT + _ACS_CONE_HEIGHT
-# Place ACS so its collar bottom lands on the top plate bottom (= _RV_STRAIGHT_H)
+# Place ACS so its neck bottom lands on the top plate bottom (= _RV_STRAIGHT_H)
 _ACS_Z_BOTTOM = _RV_STRAIGHT_H - _ACS_Z2_LOCAL
 
 ABOVE_CORE_STRUCTURE = {
@@ -241,21 +242,16 @@ ABOVE_CORE_STRUCTURE = {
     "top_cyl_height":       _ACS_TOP_CYL_HEIGHT,
     "neck_outer_r":         1.1085,
     "neck_height":          _ACS_NECK_HEIGHT,
-    "collar_outer_r":       1.1085,
-    "collar_height":        _ACS_COLLAR_HEIGHT,
     "wall_t":               0.025,
     "cone_height":          _ACS_CONE_HEIGHT,
     "cone_bottom_outer_r":  1.403,
     "bottom_ring_height":   _ACS_BOTTOM_RING_HEIGHT,
-    "closing_plate_height": 0.050,
     "top_cyl_offset_x":     0.6056,          # original component geometry
     "top_cyl_offset_y":     0.0,
-    "z_bottom":             _ACS_Z_BOTTOM,   # collar flush with top plate
+    "z_bottom":             _ACS_Z_BOTTOM,   # neck bottom flush with top plate
     "bottom_holes": {
-        "through_d":     0.080,   # Ø80 mm through-holes (all the way through)
-        "counter_d":     0.142,   # Ø142 mm counterbores
-        "counter_depth": 0.050,   # depth of counterbore from top of closing plate
-        "pitch":         0.300,   # center-to-center of the hex ring
+        "through_d": 0.080,   # Ø80 mm uniform through-holes (straight through both bodies)
+        "pitch":     0.300,   # center-to-center of the hex ring
     },
 }
 
@@ -278,6 +274,3 @@ for d in user_dicts:
 resolved = resolve(user_dicts)
 _TS = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 show(assemble_objects(resolved, export_path=f"output/esfr_smr_full_reactor_{_TS}.step"))
-
-
-

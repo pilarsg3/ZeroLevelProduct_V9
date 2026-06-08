@@ -64,7 +64,7 @@ TOP_PLATE = {
         {"hole_diameter": 2.224, "layout": "explicit_positions",
          "positions": [(0.0, 0.0)]},
         {"hole_diameter": 1.600, "layout": "symmetric", "count": 3,
-         "placement_radius": 2.730, "start_angle_deg": 0.0},
+         "placement_radius": 3.100, "start_angle_deg": 0.0},
         {"hole_diameter": 1.350, "layout": "symmetric", "count": 3,
          "placement_radius": 3.369, "start_angle_deg": 60.0},
     ],
@@ -72,7 +72,7 @@ TOP_PLATE = {
 
 # IHX placement is resolver-driven: _resolve_ihx_topplate sets center_coords
 # so the bundle window top lands one upper_plenum_wall below the top plate bottom.
-_IHX_R = 2.730
+_IHX_R = 3.100
 def _make_ihx(obj_id, angle_deg):
     return {
         "obj_type":     "ihx",
@@ -102,6 +102,7 @@ def _make_ihx(obj_id, angle_deg):
         "bundle_shell_n_bars":       8,    "bundle_shell_bar_width": 0.030,
         "bundle_shell_window_fraction": 0.1,  # 10 % of bundle_height (6.0 m)
         "bundle_shell_window_z_from_top": 1, #0.33,  # gap from z_up_bot to window top (default 0.3 + 10%)
+        "bundle_shell_window_z_from_bottom": 0.3,    # ↓ lower row only, leaves upper unchanged
         "z_bottom": 2,  # 5% higher than 1.6
     }
 IHX1 = _make_ihx("ihx_1",   0.0)
@@ -144,7 +145,7 @@ DIAGRID = {
     "obj_type":      "diagrid",
     "obj_id":        "diagrid",
     "diameter":      4.660,
-    "thickness":     1.050,
+    "height":        1.050,
     "z_bottom":      _DIAGRID_Z_BOTTOM,
     "wall_t_side":   0.030,
     "wall_t_top":    0.030,
@@ -175,39 +176,72 @@ STRONGBACK = {
     "z_bottom":               _SB_Z_BOTTOM,
 }
 
+# ── Redan (hot/cold pool separation shell) ───────────────────────────────
+# Half-section A → B → C revolved 360° about Z. With thickness_side="in",
+# the A–B–C polyline is the OUTER surface of the shell, so:
+#   A = top plate ∩ RPV inner wall      → (RV inner radius, top of RV shell)
+#   B = top of core                     → (redan lower radius, core top)
+#   C = top of the diagrid              → (redan lower radius, diagrid top)
+# The lower cylinder rests on the top face of the diagrid, so r_lower is
+# kept below the diagrid outer radius (r=2.330) and above the core radius
+# (r=1.800). The optional z_shoulder gives a cylindrical top section before
+# the taper.
+#
+# Note: this simple revolved shell has no penetrations for the IHX bundles
+# or the pump nozzles, so overlap warnings from assemble_objects are
+# expected where the redan crosses those components — those cutouts are a
+# follow-up enhancement.
+_REDAN_R_TOP      = 8.91 / 2                              # RV inner radius (= RV.inner_d / 2)
+_REDAN_R_LOWER    = 2.200                                 # clears core (r=1.800), fits on diagrid (r=2.330)
+_REDAN_Z_KNEE     = _CORE_Z_BOTTOM + _CORE_HEIGHT         # core top
+_REDAN_Z_BOTTOM   = _DIAGRID_TOP_Z                        # rests on top of the diagrid
+_REDAN_Z_SHOULDER = 6.500                                 # top cylindrical section ends here
+
+REDAN = {
+    "obj_type":       "redan",
+    "obj_id":         "redan",
+    "r_top":          _REDAN_R_TOP,
+    "z_top":          _RV_STRAIGHT_H,
+    "r_lower":        _REDAN_R_LOWER,
+    "z_knee":         _REDAN_Z_KNEE,
+    "z_bottom":       _REDAN_Z_BOTTOM,
+    "thickness":      0.025,
+    "z_shoulder":     _REDAN_Z_SHOULDER,
+    "thickness_side": "in",
+}
+
 # ── Above-core structure ─────────────────────────────────────────────────
-# The component's lower shell (bottom ring + cone + collar + neck) sits on
-# the component's local origin, and the top cylinder is displaced sideways
-# by top_cyl_offset_x. This way the cone — and the hex through-hole pattern
+# The component's lower shell (bottom ring + cone + neck) sits on the
+# component's local origin, and the top cylinder is displaced sideways by
+# top_cyl_offset_x. This way the cone — and the hex through-hole pattern
 # beneath it — can be aligned with the reactor core via the assembly's
 # center_coords (which the assembler defaults to (0, 0, …)), while the top
 # cylinder is offset so it doesn't clash with the pumps / IHX nozzles.
 #
-# The component is positioned vertically so that its collar (the wider
-# band between cone and neck) lands flush inside the top plate's central
-# opening:
-#   collar_height                       = top_plate_thickness
-#   z2 (collar bottom, local) + z_bottom = top_plate bottom (world)
+# Positioned vertically so the lower part of the neck registers into the top
+# plate's central opening:
+#   z2 (cone top = neck bottom, local) + z_bottom = top_plate bottom (world)
 _ACS_TOP_CYL_HEIGHT      = 1.008
-_ACS_NECK_HEIGHT         = 0.569
 _ACS_CONE_HEIGHT         = 2.429
 _ACS_BOTTOM_RING_HEIGHT  = 0.498
-_ACS_COLLAR_HEIGHT       = 0.500   # = top plate thickness (lock fit)
+# Single straight neck above the cone (no collar). This folds the former
+# collar band (0.092) into the neck (0.569) so the geometry is unchanged.
+_ACS_NECK_IN_PLATE_H     = 0.092   # lower neck length registering in the plate
+_ACS_NECK_FREE_H         = 0.569   # neck length above the plate
+_ACS_NECK_HEIGHT         = _ACS_NECK_IN_PLATE_H + _ACS_NECK_FREE_H   # 0.661
 
-# Local z2 = collar bottom in ACS-local coordinates
+# Local z2 = cone top (= neck bottom) in ACS-local coordinates
 _ACS_Z2_LOCAL = _ACS_BOTTOM_RING_HEIGHT + _ACS_CONE_HEIGHT
-# Place ACS so its collar bottom lands on the top plate bottom (= _RV_STRAIGHT_H)
+# Place ACS so its neck bottom lands on the top plate bottom (= _RV_STRAIGHT_H)
 _ACS_Z_BOTTOM = _RV_STRAIGHT_H - _ACS_Z2_LOCAL
 
 ABOVE_CORE_STRUCTURE = {
     "obj_type":             "above_core_structure",
     "obj_id":               "above_core_structure",
-    "top_cyl_outer_r":      1.200,           # shrunk to clear pumps & IHX
+    "top_cyl_outer_r":      1.843, #1.200,           # shrunk to clear pumps & IHX
     "top_cyl_height":       _ACS_TOP_CYL_HEIGHT,
     "neck_outer_r":         1.1085,
     "neck_height":          _ACS_NECK_HEIGHT,
-    "collar_outer_r":       1.1085,
-    "collar_height":        _ACS_COLLAR_HEIGHT,
     "wall_t":               0.025,
     "cone_height":          _ACS_CONE_HEIGHT,
     "cone_bottom_outer_r":  1.403,
@@ -215,12 +249,10 @@ ABOVE_CORE_STRUCTURE = {
     "closing_plate_height": 0.050,
     "top_cyl_offset_x":     0.6056,          # original component geometry
     "top_cyl_offset_y":     0.0,
-    "z_bottom":             _ACS_Z_BOTTOM,   # collar flush with top plate
+    "z_bottom":             _ACS_Z_BOTTOM,   # neck bottom flush with top plate
     "bottom_holes": {
-        "through_d":     0.080,   # Ø80 mm through-holes (all the way through)
-        "counter_d":     0.142,   # Ø142 mm counterbores
-        "counter_depth": 0.050,   # depth of counterbore from top of closing plate
-        "pitch":         0.300,   # center-to-center of the hex ring
+        "through_d": 0.080,   # Ø80 mm through-holes (all the way through)
+        "pitch":     0.300,   # center-to-center of the hex ring
     },
 }
 
@@ -232,6 +264,7 @@ user_dicts = [
     PUMP1, PUMP2, PUMP3,
     DIAGRID,
     CORE, STRONGBACK,
+    REDAN,
     ABOVE_CORE_STRUCTURE,
 ]
 
@@ -242,9 +275,3 @@ for d in user_dicts:
 resolved = resolve(user_dicts)
 _TS = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 show(assemble_objects(resolved, export_path=f"output/esfr_smr_full_reactor_{_TS}.step"))
-
-
-
-
-
-

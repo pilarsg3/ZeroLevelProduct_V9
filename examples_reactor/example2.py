@@ -195,11 +195,12 @@ REDAN = {
 
 
 # ── Above-core structure ───────────────────────────────────────────────
+# Single straight neck above the cone (no collar). neck_height folds the
+# former collar band (0.092) into the neck (0.569).
 _ACS_TOP_CYL_HEIGHT      = 1.008
-_ACS_NECK_HEIGHT         = 0.569
 _ACS_CONE_HEIGHT         = 2.429
 _ACS_BOTTOM_RING_HEIGHT  = 0.498
-_ACS_COLLAR_HEIGHT       = 0.092
+_ACS_NECK_HEIGHT         = 0.092 + 0.569   # = 0.661  (was collar 0.092 + neck 0.569)
 
 _ACS_Z2_LOCAL = _ACS_BOTTOM_RING_HEIGHT + _ACS_CONE_HEIGHT
 _ACS_Z_BOTTOM = _RV_STRAIGHT_H - _ACS_Z2_LOCAL
@@ -211,21 +212,16 @@ ABOVE_CORE_STRUCTURE = {
     "top_cyl_height":       _ACS_TOP_CYL_HEIGHT,
     "neck_outer_r":         1.1085,
     "neck_height":          _ACS_NECK_HEIGHT,
-    "collar_outer_r":       1.1085,
-    "collar_height":        _ACS_COLLAR_HEIGHT,
     "wall_t":               0.025,
     "cone_height":          _ACS_CONE_HEIGHT,
     "cone_bottom_outer_r":  1.403,
     "bottom_ring_height":   _ACS_BOTTOM_RING_HEIGHT,
-    "closing_plate_height": 0.050,
     "top_cyl_offset_x":     0.6056,
     "top_cyl_offset_y":     0.0,
     "z_bottom":             _ACS_Z_BOTTOM,
     "bottom_holes": {
-        "through_d":     0.080,
-        "counter_d":     0.142,
-        "counter_depth": 0.050,
-        "pitch":         0.300,
+        "through_d": 0.080,
+        "pitch":     0.300,
     },
 }
 
