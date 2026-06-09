@@ -219,10 +219,14 @@ ABOVE_CORE_STRUCTURE = {
     "top_cyl_offset_x":     0.6056,
     "top_cyl_offset_y":     0.0,
     "z_bottom":             _ACS_Z_BOTTOM,
-    "bottom_holes": {
-        "through_d": 0.080,
-        "pitch":     0.300,
+    "crdl": {
+        "through_d":          0.080,
+        "pitch":              0.300,
+        "pipe_wall_t":        0.005,
+        "pipe_extend_bottom": 0.300,
+        "pipe_extend_top":    0.300,
     },
+    "bottom_plate": {"thickness": 0.050},
 }
 
 

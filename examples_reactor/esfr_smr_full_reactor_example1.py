@@ -245,14 +245,17 @@ ABOVE_CORE_STRUCTURE = {
     "cone_height":          _ACS_CONE_HEIGHT,
     "cone_bottom_outer_r":  1.403,
     "bottom_ring_height":   _ACS_BOTTOM_RING_HEIGHT,
-    "closing_plate_height": 0.050,
     "top_cyl_offset_x":     0.6056,          # original component geometry
     "top_cyl_offset_y":     0.0,
     "z_bottom":             _ACS_Z_BOTTOM,   # neck bottom flush with top plate
-    "bottom_holes": {
-        "through_d": 0.080,   # Ø80 mm through-holes (all the way through)
-        "pitch":     0.300,   # center-to-center of the hex ring
+    "crdl": {
+        "through_d":          0.080,
+        "pitch":              0.300,
+        "pipe_wall_t":        0.005,
+        "pipe_extend_bottom": 0.300,
+        "pipe_extend_top":    0.300,
     },
+    "bottom_plate": {"thickness": 0.050},
 }
 
 

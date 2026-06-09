@@ -393,12 +393,46 @@ def _resolve_stacking_interfaces(dicts: list[dict]) -> None:
     _link("above_core_structure", "reactor_top_plate")
 
 
+def _resolve_fallback_placement(dicts: list[dict]) -> None:
+    """
+    Last-resort placement for any IHX or pump that still has no center_coords
+    after all specific rules have run (i.e. no top plate for IHX, no diagrid
+    for pump).  XY comes directly from at_radius / at_angle_deg.  Z comes from
+    z_bottom if provided, otherwise the component sits with its local origin at
+    world z = 0.
+    """
+    for comp in _find_all(dicts, "ihx") + _find_all(dicts, "primary_pump"):
+        if _is_opted_out(comp) or "center_coords" in comp:
+            continue
+        if "at_radius" not in comp or "at_angle_deg" not in comp:
+            continue
+
+        r   = comp["at_radius"]
+        a   = comp["at_angle_deg"]
+        rad = math.radians(a)
+
+        if comp["obj_type"] == "ihx":
+            z_bbox = ihx_bbox_center_z_local(comp)
+            if "z_bottom" in comp:
+                z_min_local = -comp["lower_plenum_dome_radius"]
+                center_z = comp["z_bottom"] - z_min_local + z_bbox
+            else:
+                center_z = z_bbox   # local origin at world z = 0
+        else:
+            # pump: approximate centroid at barrel mid-height
+            center_z = comp.get("z_bottom", 0.0) + comp["barrel_height"] / 2.0
+
+        comp.setdefault("center_coords",   (r * math.cos(rad), r * math.sin(rad), center_z))
+        comp.setdefault("rotation_angles", (0.0, 0.0, a))
+
+
 _CONNECTION_RULES = [
     _resolve_vessel_topplate,
     _resolve_pump_diagrid,
     _resolve_ihx_topplate,
     _resolve_redan_penetrations,
     _resolve_stacking_interfaces,
+    _resolve_fallback_placement,
 ]
 
 def resolve(user_dicts: list[dict]) -> list[dict]:

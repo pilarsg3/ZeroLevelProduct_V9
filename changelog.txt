@@ -106,3 +106,44 @@ FILES CHANGED:
   - examples_reactor/example2.py
   - examples_reactor/zzz_esfr_smr_full_reactor_revised.py
 
+======================================================================
+TIMESTAMP : 2026-06-09 10:59:23
+COMMIT    : df821e4
+AUTHOR    : pilarsg3
+MESSAGE   : Added files
+STATS     :  19 files changed, 1706 insertions(+), 131 deletions(-)
+FILES CHANGED:
+  - .gitignore
+  - IHX_Drawings_to_convert_to_py.py
+  - changelog.txt
+  - component_material_zones.py
+  - component_resolver.py
+  - components_premade/__init__.py
+  - components_premade/components_premade_above_core_structure.py
+  - components_premade/old_components_premade_above_core_structure.py
+  - components_premade/zzz_old_0606_components_premade_above_core_structure.py
+  - examples/diagrid.py
+  - examples/diagrid_and_primary_pump.py
+  - examples/ihx.py
+  - examples/primary_pump.py
+  - examples/rv.py
+  - examples/rv_with_top_plate.py
+  - examples_reactor/esfr_smr_full_reactor_example1.py
+  - from_pptx_to_python.py
+  - homogenise.py
+  - materials.py
+
+======================================================================
+TIMESTAMP : 2026-06-09 20:11:36
+COMMIT    : 5b21bdd
+AUTHOR    : pilarsg3
+MESSAGE   : update
+STATS     :  6 files changed, 237 insertions(+), 5 deletions(-)
+FILES CHANGED:
+  - examples/above_core_structure.py
+  - examples/acs_staggered_holes.py
+  - examples/diagrid_and_primary_pump.py
+  - examples/redan.py
+  - examples/redan_ihx_and_primary_pump.py
+  - examples/strongback.py
+

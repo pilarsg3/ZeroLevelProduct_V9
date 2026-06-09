@@ -156,7 +156,8 @@ def _build_above_core_structure(obj: dict[str, Any]) -> cq.Workplane:
         top_cyl_offset_x     = obj.get("top_cyl_offset_x", 0.0),
         top_cyl_offset_y     = obj.get("top_cyl_offset_y", 0.0),
         flow_hole_groups     = obj.get("flow_hole_groups"),
-        bottom_holes         = obj.get("bottom_holes"),
+        crdl                 = obj.get("crdl"),
+        bottom_plate         = obj.get("bottom_plate"),
         z_bottom             = obj.get("z_bottom", 0.0),
     )
 
@@ -310,7 +311,8 @@ def _assy_above_core_structure(obj: dict[str, Any]) -> cq.Workplane:
         top_cyl_offset_x     = obj.get("top_cyl_offset_x", 0.0),
         top_cyl_offset_y     = obj.get("top_cyl_offset_y", 0.0),
         flow_hole_groups     = obj.get("flow_hole_groups"),
-        bottom_holes         = obj.get("bottom_holes"),
+        crdl                 = obj.get("crdl"),
+        bottom_plate         = obj.get("bottom_plate"),
         z_bottom             = obj.get("z_bottom", 0.0),
     )
 

@@ -5,7 +5,7 @@ Two bodies unioned:
 
   Lower shell    [0  → z3]   bottom ring + cone + neck
                              revolved around the LOCAL ORIGIN (cone axis).
-                             SOLID — no inner bore.
+                             Hollow shell — wall thickness = wall_t.
 
   Top cylinder   [z3 → z4]   plain solid cylinder (outer r = top_cyl_outer_r),
                              translated by (top_cyl_offset_x, top_cyl_offset_y).
@@ -77,12 +77,23 @@ def create_above_core_structure(
     # ── Optional flow holes on the cone ───────────────────────────────────
     flow_hole_groups: list[dict] | None = None,
 
-    # ── Optional through-holes in the bottom (hex pattern: 1 + 6) ─────────
+    # ── Control rod drive lines — CRDL (hex pattern: 1 + 6) ──────────────
     # dict with keys:
-    #   "through_d": uniform through-hole diameter [m]            (e.g. 0.080)
-    #   "pitch":     center-to-center spacing of the hex ring [m] (default 0.300)
-    # Holes are a single diameter drilled straight through all three bodies.
-    bottom_holes: dict | None = None,
+    #   "through_d":          inner bore diameter [m]                (e.g. 0.080)
+    #   "pitch":              center-to-center hex ring spacing [m]  (default 0.300)
+    #   "pipe_wall_t":        tube wall thickness [m]                (default 0.0)
+    #   "pipe_extend_bottom": protrusion below z=0 [m]               (default 0.0)
+    #   "pipe_extend_top":    protrusion above top cylinder [m]      (default 0.0)
+    crdl: dict | None = None,
+
+    # ── Bottom perforated plate (fits inside the lower shell at z=0) ────
+    # dict with keys:
+    #   "thickness": plate thickness [m]
+    # Outer radius is cone_bottom_outer_r - wall_t (inner radius of the shell),
+    # so the plate sits inside the hollow cone.
+    # Holes are punched at each CRDL centre, sized to the pipe outer diameter,
+    # so the CRDL tubes pass through cleanly.
+    bottom_plate: dict | None = None,
 
     # ── Global position ───────────────────────────────────────────────────
     z_bottom: float = 0.0,
@@ -124,21 +135,23 @@ def create_above_core_structure(
     z3 = z2 + neck_height        # ← axis split (neck top = cylinder bottom)
     z4 = z3 + top_cyl_height
 
-    # ── 1. Lower shell (solid — no inner bore) ────────────────────────────
+    # ── 1. Lower shell (hollow — wall thickness wall_t) ───────────────────
     # The lower shell sits on the LOCAL ORIGIN. The top cylinder + closing
     # plate are the ones that carry top_cyl_offset_x/y. This way the cone /
     # cone-axis hole pattern stay on the assembly's central axis (and so can
     # be aligned with the reactor core), while the top cylinder gets
     # displaced sideways.
     lower_pts = [
-        # outer (upward)
-        (cone_bottom_outer_r, 0),
-        (cone_bottom_outer_r, z1),
-        (neck_outer_r,        z2),
-        (neck_outer_r,        z3),
-        # close along the axis back down to z=0
-        (0,                   z3),
-        (0,                   0),
+        # outer face (upward)
+        (cone_bottom_outer_r,          0),
+        (cone_bottom_outer_r,          z1),
+        (neck_outer_r,                 z2),
+        (neck_outer_r,                 z3),
+        # inner face (downward) — uniform wall thickness wall_t
+        (neck_outer_r - wall_t,        z3),
+        (neck_outer_r - wall_t,        z2),
+        (cone_bottom_outer_r - wall_t, z1),
+        (cone_bottom_outer_r - wall_t, 0),
     ]
     lower_solid = _revolve_closed(lower_pts)
 
@@ -157,6 +170,8 @@ def create_above_core_structure(
         top_cyl = top_cyl.translate((top_cyl_offset_x, top_cyl_offset_y, 0))
 
     # ── 3. Flow holes → applied to lower_solid only ───────────────────────
+    # Cutters are drilled radially (horizontal axis pointing toward the cone
+    # centre) so they appear as circles on the cone surface, not rectangles.
     if flow_hole_groups:
         for group in flow_hole_groups:
             hole_r  = float(group["hole_r"])
@@ -166,35 +181,51 @@ def create_above_core_structure(
             if z_c < 0 or z_c > z3:
                 raise ValueError(f"z_center={z_c} outside [0, {z3:.4f}] (lower shell range)")
             if z_c <= z1:
-                r_mid = cone_bottom_outer_r - wall_t / 2.0
+                r_out = cone_bottom_outer_r
             elif z_c <= z2:
                 frac  = (z_c - z1) / (z2 - z1)
                 r_out = cone_bottom_outer_r + frac * (neck_outer_r - cone_bottom_outer_r)
-                r_mid = r_out - wall_t / 2.0
             else:
-                r_mid = neck_outer_r - wall_t / 2.0
+                r_out = neck_outer_r
+            EPS_h = 1e-4
             for i in range(n):
-                a  = math.radians(start_a + 360.0 * i / n)
-                hx = r_mid * math.cos(a)
-                hy = r_mid * math.sin(a)
+                a     = math.radians(start_a + 360.0 * i / n)
+                cos_a = math.cos(a)
+                sin_a = math.sin(a)
+                # Workplane sits just outside the outer surface; normal points
+                # radially inward so the extrusion drills straight through.
+                plane = cq.Plane(
+                    origin=((r_out + EPS_h) * cos_a,
+                            (r_out + EPS_h) * sin_a,
+                            z_c),
+                    xDir=(0, 0, 1),
+                    normal=(-cos_a, -sin_a, 0),
+                )
                 cutter = (
-                    cq.Workplane("XY").workplane(offset=z_c)
-                    .circle(hole_r).extrude(wall_t * 2)
-                    .translate((hx, hy, -wall_t))
+                    cq.Workplane(plane)
+                    .circle(hole_r)
+                    .extrude(wall_t + 2 * EPS_h)
                 )
                 lower_solid = lower_solid.cut(cutter)
 
-    # ── 4. Bottom hex through-holes (uniform diameter) ────────────────────
-    # Plain through-holes (1 + 6 hex) of a single diameter, drilled straight
-    # through lower_solid + top_cyl.
-    if bottom_holes:
-        through_d = float(bottom_holes["through_d"])
-        pitch     = float(bottom_holes.get("pitch", 0.300))
+    # ── 4. Control rod drive lines — CRDL (1 + 6 hex pattern) ───────────
+    # through_d = inner bore; pipe_wall_t = tube wall; extend_bottom/top
+    # control how far the tubes protrude beyond the structure faces.
+    if crdl:
+        through_d          = float(crdl["through_d"])
+        pitch              = float(crdl.get("pitch", 0.300))
+        pipe_wall_t        = float(crdl.get("pipe_wall_t", 0.0))
+        pipe_extend_bottom = float(crdl.get("pipe_extend_bottom", 0.0))
+        pipe_extend_top    = float(crdl.get("pipe_extend_top",    0.0))
 
         if through_d <= 0:
             raise ValueError("through_d must be > 0")
 
-        through_r = through_d / 2.0
+        through_r    = through_d / 2.0
+        pipe_outer_r = through_r + pipe_wall_t
+        pipe_z0      = -pipe_extend_bottom          # pipe bottom (≤ 0)
+        pipe_z1      = z4 + pipe_extend_top         # pipe top   (≥ z4)
+        pipe_h       = pipe_z1 - pipe_z0
 
         centers = [(0.0, 0.0)]
         for i in range(6):
@@ -203,22 +234,64 @@ def create_above_core_structure(
 
         EPS = 1e-4
         for hx, hy in centers:
-            through_cutter = (
+            bore_cutter = (
                 cq.Workplane("XY")
-                .workplane(offset=-EPS)
+                .workplane(offset=pipe_z0 - EPS)
                 .circle(through_r)
-                .extrude(z4 + 2 * EPS)
+                .extrude(pipe_h + 2 * EPS)
                 .translate((hx, hy, 0))
             )
-            lower_solid = lower_solid.cut(through_cutter)
-            top_cyl     = top_cyl.cut(through_cutter)
+            if pipe_wall_t > 0:
+                pipe_outer_cyl = (
+                    cq.Workplane("XY")
+                    .workplane(offset=pipe_z0)
+                    .circle(pipe_outer_r)
+                    .extrude(pipe_h)
+                    .translate((hx, hy, 0))
+                )
+                lower_solid = lower_solid.union(pipe_outer_cyl)
+            lower_solid = lower_solid.cut(bore_cutter)
+            top_cyl     = top_cyl.cut(bore_cutter)
 
-    # ── 5. Final z translation ────────────────────────────────────────────
+    # ── 5. Bottom perforated plate ────────────────────────────────────────
+    if bottom_plate:
+        plate_t = float(bottom_plate["thickness"])
+        plate_r = cone_bottom_outer_r - wall_t
+
+        plate = (
+            cq.Workplane("XY")
+            .workplane(offset=-plate_t)
+            .circle(plate_r)
+            .extrude(plate_t)
+        )
+
+        if crdl:
+            p_bore_r = float(crdl["through_d"]) / 2.0 + float(crdl.get("pipe_wall_t", 0.0))
+            p_pitch  = float(crdl.get("pitch", 0.300))
+            p_centers = [(0.0, 0.0)]
+            for i in range(6):
+                a = math.radians(60.0 * i)
+                p_centers.append((p_pitch * math.cos(a), p_pitch * math.sin(a)))
+
+            EPS = 1e-4
+            for hx, hy in p_centers:
+                hole = (
+                    cq.Workplane("XY")
+                    .workplane(offset=-plate_t - EPS)
+                    .circle(p_bore_r)
+                    .extrude(plate_t + 2 * EPS)
+                    .translate((hx, hy, 0))
+                )
+                plate = plate.cut(hole)
+
+        lower_solid = lower_solid.union(plate)
+
+    # ── 6. Final z translation ────────────────────────────────────────────
     if z_bottom != 0.0:
         lower_solid = lower_solid.translate((0, 0, z_bottom))
         top_cyl     = top_cyl.translate((0, 0, z_bottom))
 
-    # ── 6. Assemble ───────────────────────────────────────────────────────
+    # ── 7. Assemble ───────────────────────────────────────────────────────
     return lower_solid.union(top_cyl).clean()
 
 
@@ -236,9 +309,15 @@ if __name__ == "__main__":
         bottom_ring_height   = 0.498,
         top_cyl_offset_x     = 0.6056,
         top_cyl_offset_y     = 0.0,
-        bottom_holes = {
-            "through_d": 0.080,
-            "pitch":     0.300,
+        crdl = {
+            "through_d":          0.080,
+            "pitch":              0.300,
+            "pipe_wall_t":        0.005,
+            "pipe_extend_bottom": 0.300,
+            "pipe_extend_top":    0.300,
+        },
+        bottom_plate = {
+            "thickness": 0.050,
         },
     )
     show(assy)

@@ -24,7 +24,6 @@ Manual override
 import math
 import datetime
 from assemble import assemble_objects
-from component_resolver import resolve
 from ocp_vscode import show
 from utils import convert_polar_to_cartesian
 
@@ -249,28 +248,20 @@ ABOVE_CORE_STRUCTURE = {
     "top_cyl_offset_x":     0.6056,          # original component geometry
     "top_cyl_offset_y":     0.0,
     "z_bottom":             _ACS_Z_BOTTOM,   # neck bottom flush with top plate
-    "bottom_holes": {
-        "through_d": 0.080,   # Ø80 mm uniform through-holes (straight through both bodies)
-        "pitch":     0.300,   # center-to-center of the hex ring
+    "crdl": {
+        "through_d":          0.080,
+        "pitch":              0.300,
+        "pipe_wall_t":        0.005,
+        "pipe_extend_bottom": 0.300,
+        "pipe_extend_top":    0.300,
     },
+    "bottom_plate": {"thickness": 0.050},
 }
 
 
-# ── Resolve + assemble ─────────────────────────────────────────────────
-user_dicts = [
-    RV, TOP_PLATE,
-    IHX1, IHX2, IHX3,
-    PUMP1, PUMP2, PUMP3,
-    DIAGRID,
-    CORE, STRONGBACK,
-    REDAN,
-    ABOVE_CORE_STRUCTURE,
-]
-
-# assemble_objects expects "operation": "primitive" — add it automatically.
-for d in user_dicts:
-    d.setdefault("operation", "primitive")
-
-resolved = resolve(user_dicts)
 _TS = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-show(assemble_objects(resolved, export_path=f"output/esfr_smr_full_reactor_{_TS}.step"))
+show(assemble_objects(
+    [RV, TOP_PLATE, IHX1, IHX2, IHX3, PUMP1, PUMP2, PUMP3,
+     DIAGRID, CORE, STRONGBACK, REDAN, ABOVE_CORE_STRUCTURE],
+    export_path=f"output/esfr_smr_full_reactor_{_TS}.step",
+))
