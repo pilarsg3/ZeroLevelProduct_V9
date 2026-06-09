@@ -232,6 +232,21 @@ def _resolve_pump_diagrid(dicts: list[dict]) -> None:
 
 
 # ════════════════════════════════════════════════════════════════════════
+#  Connection rule: reactor_vessel → reactor_top_plate
+# ════════════════════════════════════════════════════════════════════════
+
+def _resolve_vessel_topplate(dicts: list[dict]) -> None:
+    """Set top plate z_bottom to the vessel straight_h if not user-supplied."""
+    top_plate = _find_one(dicts, "reactor_top_plate")
+    rv        = _find_one(dicts, "reactor_vessel")
+    if top_plate is None or rv is None or _is_opted_out(top_plate):
+        return
+    straight_h = rv.get("straight_h") or rv.get("height")
+    if straight_h is not None:
+        top_plate.setdefault("z_bottom", float(straight_h))
+
+
+# ════════════════════════════════════════════════════════════════════════
 #  Connection rule: ihx ↔ reactor_top_plate
 # ════════════════════════════════════════════════════════════════════════
 
@@ -361,7 +376,7 @@ def _resolve_stacking_interfaces(dicts: list[dict]) -> None:
       - strongback inside reactor vessel bottom head
       - diagrid resting on strongback
       - core resting on diagrid
-      - above-core structure collar fitting inside top plate central hole
+      - above-core structure neck fitting inside top plate central hole
     """
     def _link(type_a: str, type_b: str) -> None:
         a = _find_one(dicts, type_a)
@@ -379,6 +394,7 @@ def _resolve_stacking_interfaces(dicts: list[dict]) -> None:
 
 
 _CONNECTION_RULES = [
+    _resolve_vessel_topplate,
     _resolve_pump_diagrid,
     _resolve_ihx_topplate,
     _resolve_redan_penetrations,

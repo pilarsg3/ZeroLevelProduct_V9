@@ -62,3 +62,47 @@ FILES CHANGED:
   - components_premade/components_premade_reactor_vessel.py
   - components_premade/components_premade_top_plate.py
 
+======================================================================
+TIMESTAMP : 2026-06-04 09:59:56
+COMMIT    : ad521cf
+AUTHOR    : pilarsg3
+MESSAGE   : Cleaned all codes except ACS
+STATS     :  14 files changed, 1305 insertions(+), 300 deletions(-)
+FILES CHANGED:
+  - IHX_Drawings.pptx
+  - changelog.txt
+  - components_premade/__init__.py
+  - components_premade/components_premade_ihx.py
+  - components_premade/components_premade_primary_pump.py
+  - components_premade/components_premade_redan.py
+  - components_premade/components_premade_strongback.py
+  - draw_nozzle_geometry.py
+  - draw_redan_params.py
+  - draw_strongback_params.py
+  - nozzle_geometry.png
+  - redan_params.png
+  - strongback_params.png
+  - zzz_claude_ihx_drawing.py
+
+======================================================================
+TIMESTAMP : 2026-06-04 16:03:33
+COMMIT    : d5d22ba
+AUTHOR    : pilarsg3
+MESSAGE   : cleaned code of above_core_structure
+STATS     :  1 file changed, 10 insertions(+), 11 deletions(-)
+FILES CHANGED:
+  - components_premade/components_premade_above_core_structure.py
+
+======================================================================
+TIMESTAMP : 2026-06-08 09:51:15
+COMMIT    : 2893820
+AUTHOR    : pilarsg3
+MESSAGE   : Changes up until 0706
+STATS     :  5 files changed, 363 insertions(+), 347 deletions(-)
+FILES CHANGED:
+  - examples_reactor/esfr_smr_full_reactor_example1.py
+  - examples_reactor/esfr_smr_full_reactor_revised.py
+  - examples_reactor/esfr_smr_full_reactor_with_redan_example1.py
+  - examples_reactor/example2.py
+  - examples_reactor/zzz_esfr_smr_full_reactor_revised.py
+

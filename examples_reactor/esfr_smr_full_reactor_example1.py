@@ -24,7 +24,6 @@ Manual override
 import math
 import datetime
 from assemble import assemble_objects
-from component_resolver import resolve
 from ocp_vscode import show
 from utils import convert_polar_to_cartesian
 
@@ -257,21 +256,9 @@ ABOVE_CORE_STRUCTURE = {
 }
 
 
-# ── Resolve + assemble ─────────────────────────────────────────────────
-user_dicts = [
-    RV, TOP_PLATE,
-    IHX1, IHX2, IHX3,
-    PUMP1, PUMP2, PUMP3,
-    DIAGRID,
-    CORE, STRONGBACK,
-    REDAN,
-    ABOVE_CORE_STRUCTURE,
-]
-
-# assemble_objects expects "operation": "primitive" — add it automatically.
-for d in user_dicts:
-    d.setdefault("operation", "primitive")
-
-resolved = resolve(user_dicts)
 _TS = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-show(assemble_objects(resolved, export_path=f"output/esfr_smr_full_reactor_{_TS}.step"))
+show(assemble_objects(
+    [RV, TOP_PLATE, IHX1, IHX2, IHX3, PUMP1, PUMP2, PUMP3,
+     DIAGRID, CORE, STRONGBACK, REDAN, ABOVE_CORE_STRUCTURE],
+    export_path=f"output/esfr_smr_full_reactor_{_TS}.step",
+))

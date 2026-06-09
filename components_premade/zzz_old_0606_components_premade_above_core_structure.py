@@ -1,16 +1,18 @@
 """
 Parametric SFR above-core structure (ACS).
 
-Two bodies unioned:
+Three bodies unioned:
 
-  Lower shell    [0  → z3]   bottom ring + cone + neck
+  Lower shell   [0  → z3]   bottom ring + cone + neck
                              revolved around the LOCAL ORIGIN (cone axis).
                              SOLID — no inner bore.
 
-  Top cylinder   [z3 → z4]   plain solid cylinder (outer r = top_cyl_outer_r),
+  Closing plate [z3 - closing_plate_height → z3]
+                             solid disk (outer r = top_cyl_outer_r),
                              translated by (top_cyl_offset_x, top_cyl_offset_y).
-                             The former separate closing plate has been merged
-                             into this single cylinder.
+
+  Upper cylinder [z3 → z4]  plain solid cylinder,
+                             translated by (top_cyl_offset_x, top_cyl_offset_y).
 
 The cone-axis stays on the local origin so the lower shell (and the hex
 through-hole pattern beneath it) can be aligned with the reactor core by
@@ -66,11 +68,14 @@ def create_above_core_structure(
     cone_height:         float,
     bottom_ring_height:  float,
 
+    # ── Closing plate ─────────────────────────────────────────────────────
+    closing_plate_height: float,
+
     # ── Top cylinder offset relative to the lower-shell (cone) axis ──────
     # The lower shell (cone + neck) sits on the local origin. The top
-    # cylinder is translated by this offset. Set to (0, 0) for a coaxial
-    # component; nonzero to displace the top cylinder sideways (e.g. to
-    # clear pumps / IHX nozzles in the assembly).
+    # cylinder + closing plate are translated by this offset. Set to
+    # (0, 0) for a coaxial component; nonzero to displace the top cylinder
+    # sideways (e.g. to clear pumps / IHX nozzles in the assembly).
     top_cyl_offset_x: float,
     top_cyl_offset_y: float,
 
@@ -79,9 +84,10 @@ def create_above_core_structure(
 
     # ── Optional through-holes in the bottom (hex pattern: 1 + 6) ─────────
     # dict with keys:
-    #   "through_d": uniform through-hole diameter [m]            (e.g. 0.080)
-    #   "pitch":     center-to-center spacing of the hex ring [m] (default 0.300)
-    # Holes are a single diameter drilled straight through all three bodies.
+    #   "through_d":    through-hole diameter [m]                   (e.g. 0.080)
+    #   "counter_d":    counterbore diameter   [m]                  (e.g. 0.142)
+    #   "counter_depth": counterbore depth from top of plate [m]    (default = closing_plate_height)
+    #   "pitch":        center-to-center spacing of the hex ring [m] (default 0.300)
     bottom_holes: dict | None = None,
 
     # ── Global position ───────────────────────────────────────────────────
@@ -89,21 +95,21 @@ def create_above_core_structure(
 
 ) -> cq.Workplane:
     """
-    Build the above-core structure as a fused Workplane of two solids:
+    Build the above-core structure as a fused Workplane of three solids:
 
-      1. ``lower_shell`` [0 → z3] — bottom ring + cone + neck.
-      2. ``top_cyl``     [z3 → z4] — a single solid cylinder (the former
-         closing plate is merged into this cylinder).
+      1. ``lower_shell``   [0 → z3] — bottom ring + cone + neck.
+      2. ``closing_plate`` [z3 - closing_plate_height → z3]
+      3. ``upper_cyl``     [z3 → z4]
 
     Boolean ops (flow holes, bottom holes) are applied to each part before
     the final union. The straight section above the cone is a single neck at
-    ``neck_outer_r``; there is no separate collar band, and the top cylinder
-    is a single body with no separate closing plate.
+    ``neck_outer_r``; there is no separate collar band.
     """
     # ── Validate ─────────────────────────────────────────────────────────
     checks = [
         (neck_outer_r > wall_t,              "neck_outer_r > wall_t"),
         (cone_bottom_outer_r > neck_outer_r, "cone_bottom_outer_r > neck_outer_r"),
+        (closing_plate_height > 0,           "closing_plate_height > 0"),
     ]
     for ok, msg in checks:
         if not ok:
@@ -142,21 +148,28 @@ def create_above_core_structure(
     ]
     lower_solid = _revolve_closed(lower_pts)
 
-    # ── 2. Top cylinder (single solid — closing plate merged in) ──────────
-    # One plain solid cylinder spanning [z3 → z4], translated to the
-    # top-cylinder offset. This replaces the former separate closing plate
-    # and upper cylinder (which were coaxial and the same radius, so their
-    # union was always a single cylinder).
-    top_cyl = (
+    # ── 2. Closing plate ──────────────────────────────────────────────────
+    # Full disk; translated to the top-cylinder offset.
+    closing_plate = (
+        cq.Workplane("XY")
+        .workplane(offset=z3 - closing_plate_height)
+        .circle(top_cyl_outer_r)
+        .extrude(closing_plate_height)
+    )
+    if top_cyl_offset_x != 0.0 or top_cyl_offset_y != 0.0:
+        closing_plate = closing_plate.translate((top_cyl_offset_x, top_cyl_offset_y, 0))
+
+    # ── 3. Upper cylinder ─────────────────────────────────────────────────
+    upper_solid = (
         cq.Workplane("XY")
         .workplane(offset=z3)
         .circle(top_cyl_outer_r)
         .extrude(top_cyl_height)
     )
     if top_cyl_offset_x != 0.0 or top_cyl_offset_y != 0.0:
-        top_cyl = top_cyl.translate((top_cyl_offset_x, top_cyl_offset_y, 0))
+        upper_solid = upper_solid.translate((top_cyl_offset_x, top_cyl_offset_y, 0))
 
-    # ── 3. Flow holes → applied to lower_solid only ───────────────────────
+    # ── 4. Flow holes → applied to lower_solid only ───────────────────────
     if flow_hole_groups:
         for group in flow_hole_groups:
             hole_r  = float(group["hole_r"])
@@ -184,17 +197,22 @@ def create_above_core_structure(
                 )
                 lower_solid = lower_solid.cut(cutter)
 
-    # ── 4. Bottom hex through-holes (uniform diameter) ────────────────────
-    # Plain through-holes (1 + 6 hex) of a single diameter, drilled straight
-    # through lower_solid + top_cyl.
+    # ── 5. Bottom hex through-holes + counterbores ────────────────────────
+    # Through-holes go through lower_solid + closing_plate + upper_solid.
+    # Counterbores are pocketed into the closing_plate.
     if bottom_holes:
-        through_d = float(bottom_holes["through_d"])
-        pitch     = float(bottom_holes.get("pitch", 0.300))
+        through_d     = float(bottom_holes["through_d"])
+        counter_d     = float(bottom_holes["counter_d"])
+        counter_depth = float(bottom_holes.get("counter_depth", closing_plate_height))
+        pitch         = float(bottom_holes.get("pitch", 0.300))
 
-        if through_d <= 0:
-            raise ValueError("through_d must be > 0")
+        if counter_d <= through_d:
+            raise ValueError("counter_d must be greater than through_d")
+        if counter_depth <= 0 or counter_depth > closing_plate_height:
+            raise ValueError(f"counter_depth ({counter_depth}) must be in (0, closing_plate_height={closing_plate_height}]")
 
         through_r = through_d / 2.0
+        counter_r = counter_d / 2.0
 
         centers = [(0.0, 0.0)]
         for i in range(6):
@@ -210,16 +228,27 @@ def create_above_core_structure(
                 .extrude(z4 + 2 * EPS)
                 .translate((hx, hy, 0))
             )
-            lower_solid = lower_solid.cut(through_cutter)
-            top_cyl     = top_cyl.cut(through_cutter)
+            lower_solid   = lower_solid.cut(through_cutter)
+            closing_plate = closing_plate.cut(through_cutter)
+            upper_solid   = upper_solid.cut(through_cutter)
 
-    # ── 5. Final z translation ────────────────────────────────────────────
+            counter_cutter = (
+                cq.Workplane("XY")
+                .workplane(offset=z3 - counter_depth)
+                .circle(counter_r)
+                .extrude(counter_depth + EPS)
+                .translate((hx, hy, 0))
+            )
+            closing_plate = closing_plate.cut(counter_cutter)
+
+    # ── 6. Final z translation ────────────────────────────────────────────
     if z_bottom != 0.0:
-        lower_solid = lower_solid.translate((0, 0, z_bottom))
-        top_cyl     = top_cyl.translate((0, 0, z_bottom))
+        lower_solid   = lower_solid.translate((0, 0, z_bottom))
+        closing_plate = closing_plate.translate((0, 0, z_bottom))
+        upper_solid   = upper_solid.translate((0, 0, z_bottom))
 
-    # ── 6. Assemble ───────────────────────────────────────────────────────
-    return lower_solid.union(top_cyl).clean()
+    # ── 7. Assemble ───────────────────────────────────────────────────────
+    return lower_solid.union(closing_plate).union(upper_solid).clean()
 
 
 if __name__ == "__main__":
@@ -234,11 +263,14 @@ if __name__ == "__main__":
         cone_height          = 2.429,
         cone_bottom_outer_r  = 1.403,
         bottom_ring_height   = 0.498,
+        closing_plate_height = 0.050,
         top_cyl_offset_x     = 0.6056,
         top_cyl_offset_y     = 0.0,
         bottom_holes = {
-            "through_d": 0.080,
-            "pitch":     0.300,
+            "through_d":     0.080,
+            "counter_d":     0.142,
+            "counter_depth": 0.050,
+            "pitch":         0.300,
         },
     )
     show(assy)
